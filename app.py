@@ -140,27 +140,46 @@ def cookies_are_set():
     cookies = load_cookies()
     return bool(cookies.get('sessionid'))
 
+
+def normalize_twitter_url(url):
+    """
+    Convert x.com → twitter.com and strip tracking query params (?s=, ?t=, etc.)
+    yt-dlp's Twitter extractor only supports twitter.com, not x.com.
+    """
+    # Replace x.com domain with twitter.com
+    url = url.replace('https://x.com/', 'https://twitter.com/')
+    url = url.replace('http://x.com/',  'https://twitter.com/')
+    # Strip all query params (Twitter tracking params like ?s=20 break yt-dlp)
+    url = url.split('?')[0].split('#')[0]
+    return url
+
+
 # ── URL type detection ──────────────────────────────────────────────────────
 def detect_url_type(url):
     """
     Returns one of:
       YouTube  → 'yt_video' | 'yt_playlist' | 'yt_channel'
       Instagram→ 'profile'  | 'post'        | 'reel'
+      Twitter  → 'twitter_video'
       Other    → 'unknown'
     """
     import re
     clean = url.split('?')[0].split('#')[0].rstrip('/')
 
+    # ── Twitter / X ───────────────────────────────────────────────────────
+    if 'twitter.com' in url or 'x.com' in url:
+        return 'twitter_video'
+
     # ── YouTube ──────────────────────────────────────────────────────────
     if 'youtube.com' in url or 'youtu.be' in url:
-        if 'list=' in url:                                      # playlist (may also have v=)
+        if 'list=' in url:
             return 'yt_playlist'
-        if (re.search(r'youtube\.com/@[^/?#]+$', clean)        # @handle
+        if (re.search(r'youtube\.com/@[^/?#]+$', clean)
                 or '/channel/' in clean
                 or re.search(r'youtube\.com/c/', clean)
                 or re.search(r'youtube\.com/user/', clean)):
             return 'yt_channel'
-        return 'yt_video'                                       # watch?v=, /shorts/, youtu.be
+        return 'yt_video'
 
     # ── Instagram ────────────────────────────────────────────────────────
     if '/reel/' in clean or '/tv/' in clean:
@@ -184,8 +203,14 @@ def index():
 def detect():
     """Tell frontend what kind of URL was pasted."""
     url = (request.json or {}).get('url', '').strip()
-    if not url or ('instagram.com' not in url and 'youtube.com' not in url and 'youtu.be' not in url):
-        return jsonify({'error': 'Not a recognised Instagram or YouTube URL'}), 400
+    if not url or (
+        'instagram.com' not in url
+        and 'youtube.com' not in url
+        and 'youtu.be' not in url
+        and 'twitter.com' not in url
+        and 'x.com' not in url
+    ):
+        return jsonify({'error': 'Not a recognised Instagram, YouTube, or Twitter/X URL'}), 400
     return jsonify({'url_type': detect_url_type(url)})
 
 
@@ -497,13 +522,19 @@ def get_preview():
     try:
         data = request.json
         instagram_url = data.get('url', '').strip()
-        
+
+        # Normalise x.com → twitter.com and strip tracking params
+        if 'twitter.com' in instagram_url or 'x.com' in instagram_url:
+            instagram_url = normalize_twitter_url(instagram_url)
+
         logger.info(f"📸 Fetching preview for: {instagram_url}")
 
         if not instagram_url or (
             'instagram.com' not in instagram_url
             and 'youtube.com' not in instagram_url
             and 'youtu.be' not in instagram_url
+            and 'twitter.com' not in instagram_url
+            and 'x.com' not in instagram_url
         ):
             return jsonify({'error': 'Invalid URL'}), 400
         
@@ -532,14 +563,24 @@ def extract_preview_info(url):
     if YTDLP_AVAILABLE:
         try:
             logger.info("🔍 Extracting preview via yt-dlp...")
+            is_twitter = 'twitter.com' in url
             ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'skip_download': True,
-                'extract_flat': False,
+                'quiet':          True,
+                'no_warnings':    True,
+                'skip_download':  True,
+                'extract_flat':   False,
                 'socket_timeout': 20,
-                'http_headers': {'User-Agent': get_random_user_agent()},
+                'http_headers':   {'User-Agent': get_random_user_agent()},
             }
+            # Twitter requires a different user-agent and no Instagram cookie file
+            if is_twitter:
+                ydl_opts['http_headers']['User-Agent'] = (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/120.0.0.0 Safari/537.36'
+                )
+            elif os.path.exists(NETSCAPE_COOKIES_FILE):
+                ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 if info:
@@ -606,13 +647,26 @@ def download():
     try:
         data         = request.json or {}
         url          = data.get('url', '').strip()
-        content_type = data.get('content_type', 'both')   # 'video' | 'audio' | 'both'
-        quality      = data.get('quality', 'best')         # YouTube quality selector
+        content_type = data.get('content_type', 'both')
+        quality      = data.get('quality', 'best')
+
+        # Normalise x.com → twitter.com and strip tracking params
+        if 'twitter.com' in url or 'x.com' in url:
+            url = normalize_twitter_url(url)
 
         logger.info(f"📥 Download: {url} | content={content_type} | quality={quality}")
 
         if not url:
             return jsonify({'error': 'URL required'}), 400
+
+        # ── Twitter / X ──
+        if 'twitter.com' in url or 'x.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_twitter(url, quality)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'Twitter/X download failed. The tweet may have no video, or it may be age-restricted.'}), 400
 
         # ── YouTube ──
         if 'youtube.com' in url or 'youtu.be' in url:
@@ -678,6 +732,58 @@ YT_FORMATS = {
     '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]',
     'audio': 'bestaudio[ext=m4a]/bestaudio',
 }
+
+# Twitter maxes out at 720p (occasionally 1080p in newer videos)
+TWITTER_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+
+def download_twitter(url, quality='best'):
+    """Download a Twitter/X video using yt-dlp."""
+    try:
+        fmt = TWITTER_FORMATS.get(quality, TWITTER_FORMATS['best'])
+        is_audio = (quality == 'audio')
+        logger.info(f"🐦 Twitter/X download: quality={quality} | fmt={fmt[:50]}")
+
+        ydl_opts = {
+            'format':         fmt,
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
+        }
+        if not is_audio:
+            ydl_opts['merge_output_format'] = 'mp4'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ Twitter download failed: {e}")
+        return None
 
 
 def download_youtube(url, quality='best', content_type='both'):
@@ -1262,19 +1368,22 @@ def proxy_thumbnail():
         return jsonify({'error': 'url param required'}), 400
     # Only allow Instagram / Facebook / YouTube CDN domains
     allowed = ('instagram.com', 'cdninstagram.com', 'fbcdn.net', 'fbsbx.com',
-               'ytimg.com', 'ggpht.com', 'googleusercontent.com')
+               'ytimg.com', 'ggpht.com', 'googleusercontent.com',
+               'twimg.com', 'pbs.twimg.com')          # Twitter/X image CDN
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
+        is_twitter = 'twimg.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
-            'Referer':    'https://www.instagram.com/',
+            'Referer':    'https://twitter.com/' if is_twitter else 'https://www.instagram.com/',
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        # Forward session cookie to CDN if we have one (needed for some private content)
-        cookies = load_cookies()
-        if cookies:
-            headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
+        # Forward Instagram session cookie only for Instagram CDN
+        if not is_twitter:
+            cookies = load_cookies()
+            if cookies:
+                headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
         resp = requests.get(img_url, headers=headers, timeout=15, stream=True)
         if resp.status_code != 200:
             return jsonify({'error': f'CDN returned {resp.status_code}'}), 502

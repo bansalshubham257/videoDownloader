@@ -875,10 +875,12 @@ def download():
         if 'youtube.com' in url or 'youtu.be' in url:
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
-            result = download_youtube(url, quality, content_type)
+            # Force YouTube to auto-download best available stream.
+            # Ignore requested quality/content to avoid fragile format selection.
+            result = download_youtube(url)
             if result:
                 return result
-            return jsonify({'error': 'YouTube download failed. Try a different quality or check the URL.'}), 400
+            return jsonify({'error': 'YouTube download failed. Video may be restricted or require authentication cookies.'}), 400
 
         # ── Instagram ──
         if 'instagram.com' in url:
@@ -1322,35 +1324,25 @@ def download_facebook(url, quality='best'):
 
 
 def download_youtube(url, quality='best', content_type='both'):
-    """Download a YouTube video/audio with the requested quality using yt-dlp."""
-    try:
-        is_audio = (content_type == 'audio' or quality == 'audio')
-        fmt      = YT_FORMATS['audio'] if is_audio else YT_FORMATS.get(quality, YT_FORMATS['best'])
-        logger.info(f"▶️ YouTube download: quality={quality} | fmt={fmt[:50]}")
+    """Download a YouTube video using auto-best available format.
 
-        if is_audio:
-            candidates = [fmt, 'bestaudio/best', 'best']
-            postprocessors = None
-            if FFMPEG_AVAILABLE:
-                postprocessors = [{
-                    'key':              'FFmpegExtractAudio',
-                    'preferredcodec':   'mp3',
-                    'preferredquality': '192',
-                }]
-        elif FFMPEG_AVAILABLE:
-            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
-            postprocessors = None
-        else:
-            candidates = [fmt, 'best[ext=mp4]/best', 'best']
-            postprocessors = None
+    Quality/content parameters are accepted for backward compatibility but
+    intentionally ignored to keep downloads resilient across environments.
+    """
+    try:
+        logger.info("▶️ YouTube download: mode=auto-best")
+
+        # Always download whatever best single entry yt-dlp can fetch.
+        # This avoids user-selected format/quality errors in production.
+        candidates = ['best']
 
         filename, file_size = _download_with_format_fallback(
             url,
             os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
             candidates,
             timeout=120,
-            merge=(not is_audio),
-            postprocessors=postprocessors,
+            merge=False,
+            postprocessors=None,
             scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg'),
             ydl_overrides=build_youtube_ydl_overrides(timeout=120)
         )

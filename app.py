@@ -87,6 +87,7 @@ USER_AGENTS = [
 ]
 
 YTDLP_COOKIE_FILE = (os.environ.get('YTDLP_COOKIE_FILE') or '').strip()
+YOUTUBE_COOKIE_FILE_FALLBACK = '/tmp/youtube_cookies.txt'
 if YTDLP_COOKIE_FILE:
     if os.path.exists(YTDLP_COOKIE_FILE):
         logger.info(f"✅ YTDLP_COOKIE_FILE configured: {YTDLP_COOKIE_FILE}")
@@ -113,6 +114,15 @@ def is_youtube_bot_challenge_error(err_text):
     )
 
 
+def resolve_youtube_cookie_file():
+    """Return a readable YouTube cookie file path if available, else ''."""
+    if YTDLP_COOKIE_FILE and os.path.exists(YTDLP_COOKIE_FILE):
+        return YTDLP_COOKIE_FILE
+    if os.path.exists(YOUTUBE_COOKIE_FILE_FALLBACK):
+        return YOUTUBE_COOKIE_FILE_FALLBACK
+    return ''
+
+
 def build_youtube_ydl_overrides(timeout=60):
     """Return yt-dlp options that are safer for YouTube in cloud environments."""
     opts = {
@@ -131,8 +141,9 @@ def build_youtube_ydl_overrides(timeout=60):
             }
         },
     }
-    if YTDLP_COOKIE_FILE and os.path.exists(YTDLP_COOKIE_FILE):
-        opts['cookiefile'] = YTDLP_COOKIE_FILE
+    cookie_file = resolve_youtube_cookie_file()
+    if cookie_file:
+        opts['cookiefile'] = cookie_file
     return opts
 
 # ── Cookie helpers ──────────────────────────────────────────────────────────
@@ -393,6 +404,51 @@ def cookie_status():
         'has_cookies': has_session,
         'keys': list(cookies.keys()) if has_session else [],
     })
+
+
+# ── /api/youtube cookies ───────────────────────────────────────────────────
+@app.route('/api/youtube/cookie-status', methods=['GET'])
+def youtube_cookie_status():
+    cookie_file = resolve_youtube_cookie_file()
+    return jsonify({
+        'has_cookies': bool(cookie_file),
+        'cookie_file': cookie_file,
+    })
+
+
+@app.route('/api/youtube/set-cookies', methods=['POST'])
+def youtube_set_cookies():
+    """Save YouTube Netscape cookie text for yt-dlp bot-check bypass."""
+    data = request.json or {}
+    cookies_text = (data.get('cookies_text') or '').strip()
+    if not cookies_text:
+        return jsonify({'error': 'cookies_text is required'}), 400
+
+    # Basic sanity check so accidental wrong payload is rejected early.
+    if 'youtube.com' not in cookies_text and '.youtube.com' not in cookies_text:
+        return jsonify({'error': 'Invalid cookie file content. Expected YouTube Netscape cookies.'}), 400
+
+    try:
+        with open(YOUTUBE_COOKIE_FILE_FALLBACK, 'w', encoding='utf-8') as f:
+            f.write(cookies_text if cookies_text.endswith('\n') else cookies_text + '\n')
+        logger.info(f"✅ YouTube cookies saved to {YOUTUBE_COOKIE_FILE_FALLBACK}")
+        return jsonify({'success': True, 'cookie_file': YOUTUBE_COOKIE_FILE_FALLBACK})
+    except Exception as e:
+        logger.error(f"❌ Could not save YouTube cookies: {e}")
+        return jsonify({'error': 'Could not save YouTube cookies'}), 500
+
+
+@app.route('/api/youtube/clear-cookies', methods=['POST'])
+def youtube_clear_cookies():
+    """Remove fallback YouTube cookie file from /tmp."""
+    try:
+        if os.path.exists(YOUTUBE_COOKIE_FILE_FALLBACK):
+            os.remove(YOUTUBE_COOKIE_FILE_FALLBACK)
+        logger.info("🗑 YouTube cookies cleared")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"❌ Could not clear YouTube cookies: {e}")
+        return jsonify({'error': 'Could not clear YouTube cookies'}), 500
 
 
 # ── /api/profile ─────────────────────────────────────────────────────────────
@@ -1359,7 +1415,8 @@ def download_youtube(url, quality='best', content_type='both'):
             return jsonify({
                 'error': (
                     'YouTube blocked this request with bot verification. '
-                    'Configure YTDLP_COOKIE_FILE (exported YouTube cookies) on the server and retry.'
+                    'Upload YouTube Netscape cookies via /api/youtube/set-cookies '
+                    'or configure YTDLP_COOKIE_FILE, then retry.'
                 )
             }), 400
         logger.warning(f"⚠️ YouTube download failed: {e}")

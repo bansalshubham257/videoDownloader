@@ -1,1088 +1,1538 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#3d82f7">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Instagram & YouTube Downloader</title>
-    <style>
-        *{margin:0;padding:0;box-sizing:border-box;}
-        body{background:#f0f0f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;padding:40px 20px;}
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context, after_this_request
+import os
+import requests
+from urllib.parse import urlparse
+import json
+from pathlib import Path
+import logging
+import sys
+import time
+import random
+from collections import defaultdict
+from threading import Lock
+from queue import Queue, Empty
+import threading
 
-        /* ── Search ── */
-        .search-wrap{max-width:640px;margin:0 auto 36px;}
-        .search-wrap h1{font-size:22px;font-weight:700;color:#111;margin-bottom:6px;text-align:center;}
-        .brand-pills{display:flex;justify-content:center;gap:8px;margin-bottom:14px;}
-        .brand-pill{padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600;}
-        .pill-ig{background:#fce4ec;color:#c2185b;}
-        .pill-yt{background:#ffebee;color:#c62828;}
-        .pill-tw{background:#e8f5fd;color:#1a8cd8;}
-        .pill-pi{background:#fce8e8;color:#e60023;}
-        .search-row{display:flex;gap:10px;}
-        .input-wrap{flex:1;position:relative;display:flex;align-items:center;}
-        .input-wrap input{width:100%;padding:14px 44px 14px 18px;font-size:15px;border:1.5px solid #ddd;border-radius:10px;outline:none;background:#fff;transition:border-color .2s;}
-        .input-wrap input:focus{border-color:#3d82f7;}
-        .input-action-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;font-size:18px;color:#aaa;line-height:1;transition:color .15s,background .15s;display:none;z-index:2;}
-        .input-action-btn:hover{color:#555;background:#f0f0f8;}
-        .input-action-btn.visible{display:flex;align-items:center;justify-content:center;}
-        #search-btn{padding:14px 26px;font-size:15px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;}
-        #search-btn:hover{background:#2e73e8;}
-        #search-btn:disabled{background:#9ab8f0;cursor:not-allowed;}
-        .settings-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
-        .settings-btn{background:none;border:none;cursor:pointer;font-size:13px;color:#888;display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;transition:background .2s;}
-        .settings-btn:hover{background:#e8e8f0;color:#333;}
-        .cookie-badge{display:inline-block;width:8px;height:8px;border-radius:50%;background:#ccc;margin-right:2px;}
-        .cookie-badge.ok{background:#27ae60;}
-        .max-posts-row{display:flex;align-items:center;gap:6px;font-size:12px;color:#888;}
-        .max-posts-row span{white-space:nowrap;}
-        .max-posts-row select{padding:4px 8px;font-size:12px;border:1.5px solid #ddd;border-radius:7px;background:#fff;color:#444;cursor:pointer;outline:none;}
-        .max-posts-row select:focus{border-color:#3d82f7;}
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
 
-        /* ── Settings Panel ── */
-        .settings-panel{max-width:640px;margin:0 auto 20px;background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.10);display:none;}
-        .settings-panel h3{font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:6px;}
-        .settings-panel .hint{font-size:12px;color:#777;margin-bottom:14px;line-height:1.6;}
-        .field-row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
-        .field-row label{font-size:12px;font-weight:600;color:#555;}
-        .field-row input{padding:10px 13px;font-size:13px;border:1.5px solid #ddd;border-radius:8px;outline:none;font-family:monospace;}
-        .field-row input:focus{border-color:#3d82f7;}
-        .settings-actions{display:flex;gap:10px;align-items:center;}
-        .save-cookie-btn{padding:10px 22px;font-size:14px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:8px;cursor:pointer;}
-        .save-cookie-btn:hover{background:#2e73e8;}
-        .clear-cookie-btn{padding:10px 16px;font-size:13px;color:#e74c3c;background:none;border:1.5px solid #e74c3c;border-radius:8px;cursor:pointer;}
-        .clear-cookie-btn:hover{background:#fde8e8;}
-        .cookie-status-msg{font-size:12px;color:#27ae60;margin-left:6px;display:none;}
-        .how-to{background:#f8f8ff;border-radius:8px;padding:12px 14px;margin-top:14px;font-size:12px;color:#555;line-height:1.7;}
-        .how-to strong{display:block;margin-bottom:4px;color:#333;}
-        .how-to ol{padding-left:18px;}
+# Always use /tmp — no files are permanently stored on disk.
+# Files are deleted automatically the moment the browser finishes downloading them.
+IS_PRODUCTION = os.environ.get('FLASK_ENV') == 'production'
+DOWNLOAD_FOLDER       = '/tmp/igdl_downloads'
+COOKIES_FILE          = '/tmp/instagram_cookies.json'
+NETSCAPE_COOKIES_FILE = '/tmp/instagram_cookies.txt'
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-        /* ── Spinner ── */
-        .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:_spin .7s linear infinite;display:none;}
-        @keyframes _spin{to{transform:rotate(360deg);}}
+# Setup logging — file handler is optional (may fail on read-only filesystems)
+log_handlers = [logging.StreamHandler(sys.stdout)]
+try:
+    log_handlers.append(logging.FileHandler('app.log'))
+except (OSError, PermissionError):
+    pass  # Skip file logging on production if not writable
 
-        /* ── Message ── */
-        #msg{max-width:640px;margin:0 auto 20px;padding:12px 16px;border-radius:8px;font-size:14px;display:none;}
-        #msg.error  {background:#fde8e8;color:#c0392b;border-left:4px solid #e74c3c;}
-        #msg.success{background:#e8f5e9;color:#27ae60;border-left:4px solid #2ecc71;}
-        #msg.info   {background:#e8f4fd;color:#1a73e8;border-left:4px solid #3d82f7;}
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=log_handlers
+)
+logger = logging.getLogger(__name__)
+logger.info("🚀 Starting Instagram Downloader - Multi-Method Version")
 
-        /* ── Single post result ── */
-        #single-result{display:none;max-width:640px;margin:0 auto;}
-        #single-result h2{font-size:20px;font-weight:600;color:#1a1a1a;text-align:center;margin-bottom:16px;}
-        #single-result .s-meta{text-align:center;font-size:13px;color:#888;margin-bottom:20px;}
+# Try to import yt-dlp
+try:
+    import yt_dlp
+    YTDLP_AVAILABLE = True
+    logger.info("✅ yt-dlp available")
+except ImportError:
+    YTDLP_AVAILABLE = False
+    logger.warning("⚠️ yt-dlp not available")
 
-        /* Instagram options (Both / Video / Audio) */
-        .options-row{max-width:360px;margin:0 auto 18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
-        .options-row label{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;background:#fff;padding:8px 16px;border-radius:8px;border:1.5px solid #ddd;}
-        .options-row label:has(input:checked){border-color:#3d82f7;background:#eef4ff;}
+# Try to import instagrapi
+try:
+    from instagrapi import Client
+    INSTAGRAPI_AVAILABLE = True
+    logger.info("✅ Instagrapi available")
+except ImportError:
+    INSTAGRAPI_AVAILABLE = False
+    logger.warning("⚠️ Instagrapi not available")
 
-        /* YouTube quality selector */
-        .yt-quality-row{max-width:480px;margin:0 auto 18px;display:none;flex-wrap:wrap;gap:8px;justify-content:center;}
-        .yt-quality-row.show{display:flex;}
-        .yt-q-btn{padding:8px 16px;font-size:13px;font-weight:600;border:1.5px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;transition:all .2s;}
-        .yt-q-btn:hover{border-color:#e53935;color:#e53935;}
-        .yt-q-btn.active{border-color:#e53935;background:#ffebee;color:#c62828;}
+# Try to import Selenium
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    SELENIUM_AVAILABLE = True
+    logger.info("✅ Selenium available")
+except ImportError:
+    SELENIUM_AVAILABLE = False
+    logger.warning("⚠️ Selenium not available")
 
-        .media-card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.10);margin:0 auto 22px;max-width:400px;}
-        .thumb-wrap{position:relative;width:100%;background:#111;min-height:120px;}
-        .thumb-wrap.ratio-16-9{aspect-ratio:16/9;}
-        .thumb-wrap.ratio-1-1{aspect-ratio:1/1;}
-        .thumb-wrap img{width:100%;height:100%;display:block;object-fit:cover;}
-        .vc{position:absolute;top:10px;right:10px;display:flex;gap:7px;}
-        .vc button{background:rgba(0,0,0,.45);border:none;color:#fff;width:32px;height:32px;border-radius:6px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
-        .dl-btn-wrap{padding:13px 14px;}
-        .dl-btn-wrap button{width:100%;padding:14px;font-size:17px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .3s;}
-        .dl-btn-wrap button:hover{background:#2e73e8;}
-        .dl-btn-wrap button:disabled{background:#9ab8f0;cursor:not-allowed;}
-        .dl-btn-wrap button.dl-done{background:#27ae60;}
-        .dl-btn-wrap button.dl-done:hover{background:#219a52;}
-        .dl-btn-wrap button.yt-btn{background:#e53935;}
-        .dl-btn-wrap button.yt-btn:hover{background:#c62828;}
-        .dl-btn-wrap button.tw-btn{background:#1a8cd8;}
-        .dl-btn-wrap button.tw-btn:hover{background:#1570b0;}
-        .dl-btn-wrap button.pi-btn{background:#e60023;}
-        .dl-btn-wrap button.pi-btn:hover{background:#b8001c;}
-        .yt-q-btn.tw-active{border-color:#1a8cd8;background:#e8f5fd;color:#1570b0;}
-        .caption{max-width:640px;margin:0 auto 28px;font-size:14px;color:#333;line-height:1.7;}
+# User agents for rotation
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+]
 
-        /* ── Copy button ── */
-        .copy-btn{display:inline-flex;align-items:center;justify-content:center;background:none;border:1.5px solid #e0e0e0;cursor:pointer;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;color:#aaa;transition:color .15s,background .15s,border-color .15s;white-space:nowrap;flex-shrink:0;}
-        .copy-btn:hover{color:#3d82f7;background:#eef4ff;border-color:#3d82f7;}
-        .copy-btn.copied{color:#27ae60;background:#e8f5e9;border-color:#27ae60;}
-        .copy-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;}
-        .copy-row .copy-btn{margin-top:2px;}
+def get_random_user_agent():
+    return random.choice(USER_AGENTS)
 
-        /* Ready card */
-        .ready-card{max-width:400px;margin:0 auto 30px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.10);text-align:center;}
-        .ready-card .rc-thumb img{width:100%;display:block;object-fit:cover;}
-        .ready-card .rc-body{padding:18px 16px;}
-        .ready-card h3{font-size:16px;color:#27ae60;margin-bottom:8px;}
-        .ready-card .rc-title{font-size:14px;font-weight:700;color:#1a1a1a;text-align:left;margin-bottom:6px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-        .ready-card .rc-caption{font-size:13px;color:#555;line-height:1.6;text-align:left;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
-        .ready-card .rc-divider{border:none;border-top:1px solid #f0f0f0;margin:8px 0;}
-        .ready-card .rc-meta{font-size:12px;color:#999;text-align:left;margin-bottom:4px;}
-        .ready-card a{display:inline-block;margin-top:10px;padding:7px 16px;background:none;color:#3d82f7;border:1.5px solid #3d82f7;border-radius:8px;font-weight:600;text-decoration:none;font-size:13px;}
-        .ready-card a:hover{background:#eef4ff;}
+# ── Cookie helpers ──────────────────────────────────────────────────────────
 
-        /* ── Profile / Playlist grid result ── */
-        #profile-result{display:none;max-width:960px;margin:0 auto;}
-        #profile-result h2{font-size:26px;font-weight:600;color:#1a1a1a;text-align:center;margin-bottom:4px;}
-        #profile-result .sub{text-align:center;color:#777;font-size:14px;margin-bottom:24px;}
+def load_cookies():
+    """Load saved Instagram cookies from JSON file.
+    Returns dict like {'sessionid': '...', 'csrftoken': '...'} or {}."""
+    try:
+        if os.path.exists(COOKIES_FILE):
+            with open(COOKIES_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.warning(f"⚠️ Could not load cookies: {e}")
+    return {}
 
-        .posts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;}
-        .post-card{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.08);}
-        .post-card .pc-thumb{position:relative;background:#1a1a2e;aspect-ratio:16/9;overflow:hidden;}
-        .post-card.ig-card .pc-thumb{aspect-ratio:1/1;}
-        .post-card .pc-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s;}
-        .post-card:hover .pc-thumb img{transform:scale(1.04);}
-        .post-card .pc-thumb .no-thumb{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#555;font-size:34px;gap:8px;background:linear-gradient(135deg,#1a1a2e 0%,#2d2d44 100%);}
-        .post-card .pc-thumb .no-thumb span{font-size:12px;color:#888;margin-top:2px;}
-        .post-card .pc-thumb .play-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.28);opacity:0;transition:opacity .25s;}
-        .post-card .pc-thumb .play-overlay svg{width:52px;height:52px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.6));}
-        .post-card:hover .pc-thumb .play-overlay{opacity:1;}
-        .post-card .pc-badge{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.60);color:#fff;font-size:11px;padding:3px 9px;border-radius:5px;backdrop-filter:blur(4px);}
-        .post-card .pc-dur{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.60);color:#fff;font-size:11px;padding:3px 8px;border-radius:5px;backdrop-filter:blur(4px);font-variant-numeric:tabular-nums;}
-        .thumb-loading{position:absolute;inset:0;background:linear-gradient(90deg,#e8e8f0 25%,#d4d4e8 50%,#e8e8f0 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;}
-        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-        .post-card .pc-body{padding:13px 14px;}
-        .post-card .pc-caption{font-size:13px;color:#444;line-height:1.5;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:40px;}
-        .post-card .pc-title{font-size:13px;font-weight:700;color:#1a1a1a;line-height:1.4;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-        .post-card .pc-desc{font-size:12px;color:#666;line-height:1.5;margin-bottom:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-        .post-card .pc-uploader{font-size:11px;color:#aaa;margin-bottom:8px;}
-        .post-card .pc-dl-btn{width:100%;padding:11px;font-size:14px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .3s;}
-        .post-card .pc-dl-btn:hover{background:#2e73e8;}
-        .post-card .pc-dl-btn:disabled{background:#9ab8f0;cursor:not-allowed;}
-        .post-card .pc-dl-btn.dl-done{background:#27ae60;}
-        .post-card.yt-card .pc-dl-btn{background:#e53935;}
-        .post-card.yt-card .pc-dl-btn:hover{background:#c62828;}
-        .post-card.yt-card .pc-dl-btn.dl-done{background:#27ae60;}
+def save_cookies(cookies: dict):
+    """Persist cookies dict to JSON file and regenerate the Netscape txt for yt-dlp."""
+    try:
+        with open(COOKIES_FILE, 'w') as f:
+            json.dump(cookies, f, indent=2)
+        _write_netscape_cookies(cookies)
+        logger.info(f"✅ Cookies saved ({list(cookies.keys())})")
+    except Exception as e:
+        logger.error(f"❌ Could not save cookies: {e}")
 
-        /* ── History ── */
-        .history-section{max-width:640px;margin:30px auto 0;}
-        .history-section h3{font-size:15px;margin-bottom:10px;color:#555;}
-        .history-item{background:#fff;border-radius:8px;padding:10px 14px;margin-bottom:7px;font-size:13px;display:flex;flex-direction:column;gap:2px;box-shadow:0 1px 4px rgba(0,0,0,.05);}
-        .history-item small{color:#999;}
+def _write_netscape_cookies(cookies: dict):
+    """Write Netscape-format cookies file for yt-dlp."""
+    expiry = int(time.time()) + 365 * 24 * 3600  # 1 year
+    lines = ["# Netscape HTTP Cookie File", "# https://curl.se/docs/http-cookies.html", ""]
+    for name, value in cookies.items():
+        if value:
+            lines.append(f".instagram.com\tTRUE\t/\tTRUE\t{expiry}\t{name}\t{value}")
+    with open(NETSCAPE_COOKIES_FILE, 'w') as f:
+        f.write('\n'.join(lines) + '\n')
 
-        /* ── Download-All toolbar ── */
-        .dl-all-bar{max-width:960px;margin:0 auto 22px;background:#fff;border-radius:12px;padding:14px 18px;box-shadow:0 2px 10px rgba(0,0,0,.07);display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-        .dl-all-btn{padding:11px 24px;font-size:14px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;transition:background .2s;}
-        .dl-all-btn:hover{background:#2e73e8;}
-        .dl-all-btn:disabled{background:#9ab8f0;cursor:not-allowed;}
-        .dl-all-btn.dl-done{background:#27ae60;}
-        .dl-all-btn.yt-dl-btn{background:#e53935;}
-        .dl-all-btn.yt-dl-btn:hover{background:#c62828;}
-        .stop-all-btn{padding:11px 18px;font-size:14px;font-weight:600;color:#e74c3c;background:none;border:1.5px solid #e74c3c;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .2s;}
-        .stop-all-btn:hover{background:#fde8e8;}
-        .dl-progress-wrap{flex:1;min-width:180px;display:flex;align-items:center;gap:10px;}
-        .dl-progress-bar{flex:1;height:7px;background:#e8e8f0;border-radius:4px;overflow:hidden;}
-        .dl-progress-fill{height:100%;background:#3d82f7;border-radius:4px;transition:width .4s ease;width:0%;}
-        .dl-progress-fill.done{background:#27ae60;}
-        .dl-progress-text{font-size:13px;color:#555;white-space:nowrap;min-width:90px;text-align:right;}
-        .dl-all-spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:_spin .7s linear infinite;display:none;}
-        /* ── Lightbox ── */
-        .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;}
-        .lightbox.show{display:flex;}
-        .lightbox img{max-width:92vw;max-height:92vh;border-radius:10px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.6);}
-        .lightbox-close{position:absolute;top:18px;right:22px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1;opacity:.8;}
-        .lightbox-close:hover{opacity:1;}
+def get_session_headers(extra: dict = None):
+    """Build request headers with Instagram session cookies if available."""
+    cookies = load_cookies()
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        'x-ig-app-id': '936619743392459',
+        'x-requested-with': 'XMLHttpRequest',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.instagram.com/',
+        'Origin': 'https://www.instagram.com',
+    }
+    if cookies:
+        cookie_str = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
+        headers['Cookie'] = cookie_str
+        if cookies.get('csrftoken'):
+            headers['x-csrftoken'] = cookies['csrftoken']
+    if extra:
+        headers.update(extra)
+    return headers
 
-        /* YouTube grid quality picker */
-        .yt-grid-quality{display:none;align-items:center;gap:7px;font-size:12px;color:#888;}
-        .yt-grid-quality.show{display:flex;}
-        .yt-grid-quality select{padding:5px 9px;font-size:12px;border:1.5px solid #ddd;border-radius:7px;background:#fff;cursor:pointer;outline:none;}
-        .yt-grid-quality select:focus{border-color:#e53935;}
+def cookies_are_set():
+    cookies = load_cookies()
+    return bool(cookies.get('sessionid'))
 
-        /* ── Mobile / Responsive ── */
 
-        /* Smooth tap — remove grey flash on iOS */
-        button,a,input,select,label{-webkit-tap-highlight-color:transparent;}
+def normalize_twitter_url(url):
+    """
+    Convert x.com → twitter.com and strip tracking query params (?s=, ?t=, etc.)
+    yt-dlp's Twitter extractor only supports twitter.com, not x.com.
+    """
+    # Replace x.com domain with twitter.com
+    url = url.replace('https://x.com/', 'https://twitter.com/')
+    url = url.replace('http://x.com/',  'https://twitter.com/')
+    # Strip all query params (Twitter tracking params like ?s=20 break yt-dlp)
+    url = url.split('?')[0].split('#')[0]
+    return url
 
-        /* ── Tablet (≤ 768px) ── */
-        @media (max-width:768px){
-            .posts-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
-            #profile-result h2{font-size:22px;}
-            .dl-all-bar{padding:12px 14px;gap:10px;}
+
+# ── URL type detection ──────────────────────────────────────────────────────
+def detect_url_type(url):
+    """
+    Returns one of:
+      YouTube  → 'yt_video' | 'yt_playlist' | 'yt_channel'
+      Instagram→ 'profile'  | 'post'        | 'reel'
+      Twitter  → 'twitter_video'
+      Other    → 'unknown'
+    """
+    import re
+    clean = url.split('?')[0].split('#')[0].rstrip('/')
+
+    # ── Pinterest ─────────────────────────────────────────────────────────
+    if 'pinterest.com' in url or 'pinterest.co' in url or 'pin.it' in url:
+        if '/pin/' in url or 'pin.it' in url:
+            return 'pinterest_post'    # individual pin
+        return 'pinterest_profile'     # profile or board — not downloadable
+
+    # ── Twitter / X ───────────────────────────────────────────────────────
+    if 'twitter.com' in url or 'x.com' in url:
+        if '/status/' in url:
+            return 'twitter_video'   # individual tweet with video
+        return 'twitter_profile'     # profile page — not downloadable
+
+    # ── YouTube ──────────────────────────────────────────────────────────
+    if 'youtube.com' in url or 'youtu.be' in url:
+        if 'list=' in url:
+            return 'yt_playlist'
+        if (re.search(r'youtube\.com/@[^/?#]+$', clean)
+                or '/channel/' in clean
+                or re.search(r'youtube\.com/c/', clean)
+                or re.search(r'youtube\.com/user/', clean)):
+            return 'yt_channel'
+        return 'yt_video'
+
+    # ── Instagram ────────────────────────────────────────────────────────
+    if '/reel/' in clean or '/tv/' in clean:
+        return 'reel'
+    if '/p/' in clean:
+        return 'post'
+    if re.search(r'instagram\.com/([A-Za-z0-9_.]+)$', clean) and \
+       not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
+        return 'profile'
+
+    return 'unknown'
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+# ── /api/detect ──────────────────────────────────────────────────────────────
+@app.route('/api/detect', methods=['POST'])
+def detect():
+    """Tell frontend what kind of URL was pasted."""
+    url = (request.json or {}).get('url', '').strip()
+    if not url or (
+        'instagram.com' not in url
+        and 'youtube.com' not in url
+        and 'youtu.be' not in url
+        and 'twitter.com' not in url
+        and 'x.com' not in url
+        and 'pinterest.com' not in url
+        and 'pinterest.co' not in url
+        and 'pin.it' not in url
+    ):
+        return jsonify({'error': 'Not a recognised Instagram, YouTube, Twitter/X, or Pinterest URL'}), 400
+    return jsonify({'url_type': detect_url_type(url)})
+
+
+# ── /api/set-cookie ──────────────────────────────────────────────────────────
+@app.route('/api/set-cookie', methods=['POST'])
+def set_cookie():
+    """Save Instagram session cookies provided by the user."""
+    data = request.json or {}
+    sessionid = data.get('sessionid', '').strip()
+    csrftoken  = data.get('csrftoken', '').strip()
+    ds_user_id = data.get('ds_user_id', '').strip()
+
+    if not sessionid:
+        return jsonify({'error': 'sessionid is required'}), 400
+
+    cookies = {'sessionid': sessionid}
+    if csrftoken:
+        cookies['csrftoken'] = csrftoken
+    if ds_user_id:
+        cookies['ds_user_id'] = ds_user_id
+
+    save_cookies(cookies)
+    return jsonify({'success': True, 'message': 'Cookies saved successfully'})
+
+
+# ── /api/cookie-status ───────────────────────────────────────────────────────
+@app.route('/api/cookie-status', methods=['GET'])
+def cookie_status():
+    cookies = load_cookies()
+    has_session = bool(cookies.get('sessionid'))
+    return jsonify({
+        'has_cookies': has_session,
+        'keys': list(cookies.keys()) if has_session else [],
+    })
+
+
+# ── /api/profile ─────────────────────────────────────────────────────────────
+@app.route('/api/profile', methods=['POST'])
+def get_profile_posts():
+    """Fetch posts from an Instagram profile with pagination."""
+    import re
+    body      = request.json or {}
+    url       = body.get('url', '').strip()
+    max_posts = min(int(body.get('max_posts', 50)), 500)   # default 50, hard cap 500
+
+    if not url or 'instagram.com' not in url:
+        return jsonify({'error': 'Invalid Instagram URL'}), 400
+
+    clean_url = url.split('?')[0].split('#')[0]
+    username  = re.search(r'instagram\.com/([A-Za-z0-9_.]+)', clean_url)
+    if not username:
+        return jsonify({'error': 'Could not extract username'}), 400
+    username = username.group(1)
+    logger.info(f"👤 Fetching up to {max_posts} posts for @{username}")
+
+    posts = []
+
+    # ── Method 1: Mobile Feed API with next_max_id pagination (requires cookie) ──
+    # Preferred when authenticated — supports 33 posts/page and proper pagination.
+    if cookies_are_set():
+        posts = _fetch_profile_graphql(username, max_posts)
+
+    # ── Method 2: web_profile_info – always returns exactly 12, no working cursor ──
+    # Used when unauthenticated OR as fallback if the feed API failed.
+    # Instagram killed the old GraphQL cursor endpoint (query_hash returns 400).
+    if not posts:
+        posts = _fetch_profile_internal_api(username, max_posts)
+
+
+    # ── Method 3: yt-dlp ──────────────────────────────────────────────────
+    if not posts and YTDLP_AVAILABLE:
+        try:
+            logger.info("🔍 Trying yt-dlp for profile...")
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'skip_download': True,
+                'extract_flat': True,
+                'playlistend': max_posts,
+                'socket_timeout': 30,
+                'http_headers': {'User-Agent': get_random_user_agent()},
+            }
+            if os.path.exists(NETSCAPE_COOKIES_FILE):
+                ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
+                logger.info("🍪 Using saved cookies with yt-dlp")
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(f'https://www.instagram.com/{username}/', download=False)
+                if info and info.get('entries'):
+                    for entry in info['entries']:
+                        if not entry:
+                            continue
+                        post_url = entry.get('url') or entry.get('webpage_url') or f"https://www.instagram.com/p/{entry.get('id', '')}/"
+                        posts.append({
+                            'url':         post_url,
+                            'thumbnail':   entry.get('thumbnail', ''),
+                            'title':       entry.get('title', ''),
+                            'description': entry.get('description', '') or entry.get('title', ''),
+                            'is_video':    entry.get('ext') not in ('jpg', 'jpeg', 'png', 'webp'),
+                            'duration':    _fmt_dur(entry.get('duration')),
+                            'id':          entry.get('id', ''),
+                        })
+                    logger.info(f"✅ yt-dlp got {len(posts)} posts for @{username}")
+        except Exception as e:
+            logger.warning(f"⚠️ yt-dlp profile failed: {e}")
+
+    # ── Method 4: HTML scraping ───────────────────────────────────────────
+    if not posts:
+        try:
+            logger.info("🔍 Trying HTML scrape for profile...")
+            headers = get_session_headers({'User-Agent': get_random_user_agent()})
+            resp    = requests.get(f'https://www.instagram.com/{username}/', headers=headers, timeout=20)
+            m = re.search(r'window\._sharedData\s*=\s*(\{.+?\});</script>', resp.text)
+            if m:
+                shared = json.loads(m.group(1))
+                edges  = (shared.get('entry_data', {})
+                                .get('ProfilePage', [{}])[0]
+                                .get('graphql', {})
+                                .get('user', {})
+                                .get('edge_owner_to_timeline_media', {})
+                                .get('edges', []))
+                for e in edges[:max_posts]:
+                    n = e.get('node', {})
+                    thumb      = n.get('thumbnail_src') or n.get('display_url', '')
+                    shortcode  = n.get('shortcode', '')
+                    is_video   = n.get('is_video', False)
+                    cap_edges  = n.get('edge_media_to_caption', {}).get('edges', [])
+                    caption    = cap_edges[0]['node']['text'] if cap_edges else ''
+                    posts.append({
+                        'url':         f'https://www.instagram.com/p/{shortcode}/',
+                        'thumbnail':   thumb,
+                        'title':       caption[:80] if caption else 'Instagram Post',
+                        'description': caption,
+                        'is_video':    is_video,
+                        'duration':    '',
+                        'id':          shortcode,
+                    })
+                logger.info(f"✅ HTML scrape got {len(posts)} posts for @{username}")
+        except Exception as e:
+            logger.warning(f"⚠️ HTML scrape profile failed: {e}")
+
+    if not posts:
+        needs_cookie = not cookies_are_set()
+        msg = (
+            f'Could not fetch posts for @{username}. '
+            + ('Instagram requires a session cookie. Use ⚙️ Settings to add yours.'
+               if needs_cookie
+               else 'Instagram is blocking requests. Your cookie may have expired — update it in ⚙️ Settings.')
+        )
+        return jsonify({'error': msg, 'needs_cookie': needs_cookie}), 400
+
+    return jsonify({
+        'success':  True,
+        'username': username,
+        'posts':    posts[:max_posts],
+        'count':    len(posts[:max_posts]),
+    })
+
+
+def _fmt_dur(seconds):
+    if not seconds:
+        return ''
+    s = int(seconds)
+    return f"{s//60}:{s%60:02d}"
+
+
+def _edge_to_post(e):
+    """Convert a GraphQL edge node → post dict."""
+    n         = e.get('node', {})
+    shortcode = n.get('shortcode', '')
+    is_video  = n.get('is_video', False)
+    thumb     = n.get('thumbnail_src') or n.get('display_url', '')
+    cap_edges = n.get('edge_media_to_caption', {}).get('edges', [])
+    caption   = cap_edges[0]['node']['text'] if cap_edges else ''
+    dur       = n.get('video_duration')
+    return {
+        'url':         f'https://www.instagram.com/p/{shortcode}/',
+        'thumbnail':   thumb,
+        'title':       caption[:80] if caption else 'Instagram Post',
+        'description': caption,
+        'is_video':    is_video,
+        'duration':    _fmt_dur(dur),
+        'id':          shortcode,
+    }
+
+
+def _item_to_post(item):
+    """Convert a mobile-API item → post dict."""
+    shortcode = item.get('code') or item.get('id', '')
+    is_video  = item.get('media_type') == 2
+    candidates = item.get('image_versions2', {}).get('candidates', [])
+    thumb      = candidates[0]['url'] if candidates else ''
+    cap_obj    = item.get('caption')
+    caption    = cap_obj.get('text', '') if cap_obj else ''
+    dur        = item.get('video_duration')
+    return {
+        'url':         f'https://www.instagram.com/p/{shortcode}/',
+        'thumbnail':   thumb,
+        'title':       caption[:80] if caption else 'Instagram Post',
+        'description': caption,
+        'is_video':    is_video,
+        'duration':    _fmt_dur(dur),
+        'id':          shortcode,
+    }
+
+
+def _fetch_profile_internal_api(username, max_posts=50):
+    """
+    Fetch the first page of posts via web_profile_info.
+    Always returns exactly 12 posts (Instagram's page size).
+    Cursor-based pagination via the old GraphQL query_hash endpoint
+    was killed by Instagram in 2026 (returns 400 'Incorrect Query').
+    For more posts, use _fetch_profile_graphql() which requires a session cookie.
+    """
+    posts = []
+    try:
+        logger.info(f"🔍 web_profile_info for @{username} (first 12, no pagination without auth)…")
+        headers = get_session_headers()
+        resp = requests.get(
+            f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
+            headers=headers, timeout=20,
+        )
+        logger.info(f"   web_profile_info status: {resp.status_code}")
+        if resp.status_code != 200:
+            return posts
+
+        data     = resp.json()
+        user     = data.get('data', {}).get('user', {})
+        timeline = user.get('edge_owner_to_timeline_media', {})
+        edges    = timeline.get('edges', [])
+        pi       = timeline.get('page_info', {})
+
+        posts = [_edge_to_post(e) for e in edges]
+        logger.info(f"   Got {len(posts)} posts. has_next_page={pi.get('has_next_page')} "
+                    f"(further pagination requires session cookie)")
+    except Exception as e:
+        logger.warning(f"⚠️ web_profile_info failed: {e}")
+    return posts
+
+
+def _fetch_profile_graphql(username, max_posts=50):
+    """
+    Fetch posts via the private mobile Feed API with next_max_id pagination.
+    Requires a valid session cookie.
+    """
+    posts = []
+    try:
+        if not cookies_are_set():
+            logger.info("⏭️  Feed API: no session cookie – skipping")
+            return posts
+
+        logger.info(f"🔍 Feed API (paginated) for @{username}, want {max_posts}…")
+        headers = get_session_headers()
+
+        # Resolve user_id
+        resp = requests.get(
+            f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
+            headers=headers, timeout=20,
+        )
+        if resp.status_code != 200:
+            logger.warning(f"⚠️ Feed API: user lookup returned {resp.status_code}")
+            return posts
+
+        user_id = resp.json().get('data', {}).get('user', {}).get('id')
+        if not user_id:
+            logger.warning("⚠️ Feed API: user_id not found")
+            return posts
+
+        mobile_ua   = ('Instagram 219.0.0.12.117 Android '
+                       '(29/10; 420dpi; 1080x2400; Xiaomi; M2101K6G; garnet; qcom; en_US; 346055813)')
+        next_max_id = None
+        page        = 1
+
+        while len(posts) < max_posts:
+            feed_url = f'https://i.instagram.com/api/v1/feed/user/{user_id}/?count=33'
+            if next_max_id:
+                feed_url += f'&max_id={next_max_id}'
+
+            feed_resp = requests.get(
+                feed_url,
+                headers=get_session_headers({'User-Agent': mobile_ua}),
+                timeout=20,
+            )
+            logger.info(f"   Feed page {page} status: {feed_resp.status_code}")
+            if feed_resp.status_code != 200:
+                break
+
+            feed_data   = feed_resp.json()
+            items       = feed_data.get('items', [])
+            next_max_id = feed_data.get('next_max_id')
+
+            posts.extend(_item_to_post(i) for i in items)
+            logger.info(f"   Feed page {page}: +{len(items)} posts (total {len(posts)})")
+
+            if not items or not next_max_id:
+                break
+            page += 1
+            time.sleep(0.4)
+
+        logger.info(f"✅ Feed API: {len(posts)} posts fetched for @{username}")
+    except Exception as e:
+        logger.warning(f"⚠️ Feed API failed: {e}")
+    return posts[:max_posts]
+
+
+@app.route('/api/preview', methods=['POST'])
+def get_preview():
+    """Get preview information for Instagram URL"""
+    try:
+        data = request.json
+        instagram_url = data.get('url', '').strip()
+
+        # Normalise x.com → twitter.com and strip tracking params
+        if 'twitter.com' in instagram_url or 'x.com' in instagram_url:
+            instagram_url = normalize_twitter_url(instagram_url)
+
+        logger.info(f"📸 Fetching preview for: {instagram_url}")
+
+        if not instagram_url or (
+            'instagram.com' not in instagram_url
+            and 'youtube.com' not in instagram_url
+            and 'youtu.be' not in instagram_url
+            and 'twitter.com' not in instagram_url
+            and 'x.com' not in instagram_url
+            and 'pinterest.com' not in instagram_url
+            and 'pinterest.co' not in instagram_url
+            and 'pin.it' not in instagram_url
+        ):
+            return jsonify({'error': 'Invalid URL'}), 400
+        
+        # Try to extract preview info
+        preview_info = extract_preview_info(instagram_url)
+        
+        if preview_info:
+            return jsonify({
+                'success': True,
+                'preview': preview_info
+            })
+        else:
+            return jsonify({'error': 'Could not extract preview'}), 400
+        
+    except Exception as e:
+        logger.error(f"❌ Error in get_preview: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+def extract_preview_info(url):
+    """Extract preview information from Instagram URL using multiple methods"""
+    import re
+
+    preview_data = {}
+
+    # ── Method 1: yt-dlp (most reliable, gets real caption + thumbnail) ──
+    if YTDLP_AVAILABLE:
+        try:
+            logger.info("🔍 Extracting preview via yt-dlp...")
+            is_twitter = 'twitter.com' in url
+            ydl_opts = {
+                'quiet':          True,
+                'no_warnings':    True,
+                'skip_download':  True,
+                'extract_flat':   False,
+                'socket_timeout': 20,
+                'http_headers':   {'User-Agent': get_random_user_agent()},
+            }
+            # Twitter requires a different user-agent and no Instagram cookie file
+            if is_twitter:
+                ydl_opts['http_headers']['User-Agent'] = (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/120.0.0.0 Safari/537.36'
+                )
+            elif os.path.exists(NETSCAPE_COOKIES_FILE):
+                ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info:
+                    preview_data['thumbnail']   = info.get('thumbnail') or (info.get('thumbnails') or [{}])[-1].get('url', '')
+                    preview_data['title']       = info.get('title', '')
+                    preview_data['description'] = info.get('description', '')   # keep separate from title
+                    preview_data['is_video']    = info.get('ext') not in ('jpg', 'png', 'jpeg', 'webp')
+                    preview_data['type']        = 'video' if preview_data['is_video'] else 'photo'
+
+                    # Duration
+                    dur = info.get('duration')
+                    if dur:
+                        preview_data['duration'] = f"{int(dur)//60}:{int(dur)%60:02d}"
+
+                    logger.info(f"✅ yt-dlp preview: thumbnail={'yes' if preview_data.get('thumbnail') else 'no'}, desc_len={len(preview_data.get('description',''))}")
+                    return preview_data
+        except Exception as e:
+            logger.warning(f"⚠️ yt-dlp preview failed: {e}")
+
+    # ── Method 2: HTML scraping (og: meta tags) ──
+    try:
+        logger.info("🔍 Extracting preview via HTML scraping...")
+        headers = {'User-Agent': get_random_user_agent()}
+        resp = requests.get(url, headers=headers, timeout=20)
+
+        if resp.status_code == 200:
+            html = resp.text
+
+            def _og(prop):
+                m = re.search(rf'og:{prop}"[^>]*content=["\']([^"\']+)["\']', html) or \
+                    re.search(rf'content=["\']([^"\']+)["\'][^>]*og:{prop}', html)
+                return m.group(1) if m else ''
+
+            thumbnail   = _og('image')
+            title       = _og('title')
+            description = _og('description')
+            is_video    = bool(re.search(r'og:video', html))
+
+            if thumbnail or description:
+                preview_data['thumbnail']   = thumbnail
+                preview_data['title']       = title
+                preview_data['description'] = description
+                preview_data['is_video']    = is_video
+                preview_data['type']        = 'video' if is_video else 'photo'
+
+    except Exception as e:
+        logger.warning(f"⚠️ HTML scrape preview failed: {e}")
+
+    # ── Method 3: Twitter oEmbed (public, no auth — works for text-only tweets) ──
+    is_twitter_url = 'twitter.com' in url or 'x.com' in url
+    if is_twitter_url:
+        try:
+            logger.info("🔍 Trying Twitter oEmbed API...")
+            oembed_url = f'https://publish.twitter.com/oembed?url={url}&omit_script=true'
+            r = requests.get(oembed_url, timeout=10)
+            if r.status_code == 200:
+                oe = r.json()
+                # Extract plain text from the HTML snippet
+                raw_html = oe.get('html', '')
+                tweet_text = re.sub(r'<[^>]+>', ' ', raw_html)   # strip tags
+                tweet_text = re.sub(r'\s+', ' ', tweet_text).strip()
+                author = oe.get('author_name', '')
+
+                if not preview_data.get('title'):
+                    preview_data['title'] = author
+                if not preview_data.get('description'):
+                    preview_data['description'] = tweet_text
+                if 'is_video' not in preview_data:
+                    preview_data['is_video'] = False
+                    preview_data['no_video'] = True   # signal: text-only tweet
+                preview_data['type'] = preview_data.get('type', 'tweet')
+                logger.info(f"✅ oEmbed: author={author}, text_len={len(tweet_text)}")
+        except Exception as e:
+            logger.warning(f"⚠️ Twitter oEmbed failed: {e}")
+
+    if preview_data:
+        return preview_data
+
+    logger.warning("⚠️ All preview methods failed")
+    return None
+
+
+@app.route('/api/download', methods=['POST'])
+def download():
+    try:
+        data         = request.json or {}
+        url          = data.get('url', '').strip()
+        content_type = data.get('content_type', 'both')
+        quality      = data.get('quality', 'best')
+
+        # Normalise x.com → twitter.com and strip tracking params
+        if 'twitter.com' in url or 'x.com' in url:
+            url = normalize_twitter_url(url)
+
+        logger.info(f"📥 Download: {url} | content={content_type} | quality={quality}")
+
+        if not url:
+            return jsonify({'error': 'URL required'}), 400
+
+        # ── Pinterest ──
+        if 'pinterest.com' in url or 'pinterest.co' in url or 'pin.it' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_pinterest(url)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'Pinterest download failed. The pin may contain no video/image, or may be private.'}), 400
+
+        # ── Twitter / X ──
+        if 'twitter.com' in url or 'x.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_twitter(url, quality)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'Twitter/X download failed. The tweet may have no video, or it may be age-restricted.'}), 400
+
+        # ── YouTube ──
+        if 'youtube.com' in url or 'youtu.be' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_youtube(url, quality, content_type)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'YouTube download failed. Try a different quality or check the URL.'}), 400
+
+        # ── Instagram ──
+        if 'instagram.com' not in url:
+            return jsonify({'error': 'Unsupported URL. Paste an Instagram or YouTube link.'}), 400
+
+        return try_download_methods(url, 'best', content_type)
+
+    except Exception as e:
+        logger.error(f"❌ Download error: {e}", exc_info=True)
+        return jsonify({'error': f'Download failed: {str(e)}'}), 500
+
+def try_download_methods(url, format_id, content_type='both'):
+    """Try multiple download methods in order of reliability"""
+
+    methods = []
+
+    # Method 1: yt-dlp for videos; automatically falls through to photo handler on "no video"
+    if YTDLP_AVAILABLE:
+        methods.append(('yt-dlp', download_with_ytdlp, [url, format_id, content_type]))
+
+    # Method 2: Dedicated Instagram photo downloader (Instagram API + CDN direct)
+    methods.append(('Instagram Photo', download_instagram_photo, [url]))
+
+    # Method 3: Instagrapi
+    if INSTAGRAPI_AVAILABLE:
+        methods.append(('Instagrapi', download_with_instagrapi, [url, content_type]))
+
+    # Method 4: Direct HTTP extraction
+    methods.append(('Direct HTTP', download_direct_http, [url, content_type]))
+
+    for method_name, method_func, args in methods:
+        try:
+            logger.info(f"🔄 Trying: {method_name}")
+            result = method_func(*args)
+            if result and result.status_code == 200:
+                logger.info(f"✅ Success with {method_name}")
+                return result
+        except Exception as e:
+            logger.warning(f"⚠️ {method_name} failed: {str(e)}")
+            continue
+
+    return jsonify({
+        'error': 'All download methods failed. Instagram may be blocking this content. Try again in a few minutes.'
+    }), 400
+
+
+# ── YouTube ──────────────────────────────────────────────────────────────────
+
+YT_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best',
+    '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]',
+    'audio': 'bestaudio[ext=m4a]/bestaudio',
+}
+
+# Twitter maxes out at 720p (occasionally 1080p in newer videos)
+TWITTER_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+
+def download_twitter(url, quality='best'):
+    """Download a Twitter/X video using yt-dlp."""
+    try:
+        fmt = TWITTER_FORMATS.get(quality, TWITTER_FORMATS['best'])
+        is_audio = (quality == 'audio')
+        logger.info(f"🐦 Twitter/X download: quality={quality} | fmt={fmt[:50]}")
+
+        ydl_opts = {
+            'format':         fmt,
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
         }
+        if not is_audio:
+            ydl_opts['merge_output_format'] = 'mp4'
 
-        /* ── Phone (≤ 600px) ── */
-        @media (max-width:600px){
-            body{padding:20px 12px 40px;}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'no video' in err or 'no media' in err or 'does not have' in err:
+            return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
+        if 'guest token' in err or 'bad guest' in err:
+            return jsonify({'error': '⚠️ Twitter API temporarily unavailable. Please try again in a moment.'}), 400
+        logger.warning(f"⚠️ Twitter download failed: {e}")
+        return None
 
-            /* Header */
-            .search-wrap{margin-bottom:20px;}
-            .search-wrap h1{font-size:19px;}
 
-            /* Search row — stack vertically */
-            .search-row{flex-direction:column;gap:8px;}
-            .input-wrap input{font-size:16px;padding:14px 44px 14px 16px;}
-            #search-btn{width:100%;justify-content:center;padding:14px 20px;font-size:15px;}
-
-            /* Settings row — stack */
-            .settings-row{flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px;}
-            .max-posts-row select{font-size:14px;padding:6px 10px;}
-            .settings-btn{font-size:13px;}
-
-            /* Settings panel */
-            .settings-panel{padding:16px;}
-            .field-row input{font-size:16px;} /* prevent iOS zoom */
-            .settings-actions{flex-wrap:wrap;}
-            .save-cookie-btn,.clear-cookie-btn{flex:1;text-align:center;}
-
-            /* Message */
-            #msg{font-size:13px;padding:10px 14px;}
-
-            /* Single result */
-            #single-result h2{font-size:17px;margin-bottom:12px;}
-            #single-result .s-meta{font-size:12px;margin-bottom:14px;}
-
-            /* Options row */
-            .options-row{max-width:100%;gap:6px;}
-            .options-row label{padding:9px 14px;font-size:13px;flex:1;justify-content:center;}
-
-            /* YouTube quality — horizontal scroll on very small screens */
-            .yt-quality-row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;justify-content:flex-start;padding-bottom:4px;max-width:100%;}
-            .yt-quality-row::-webkit-scrollbar{height:3px;}
-            .yt-quality-row::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px;}
-            .yt-q-btn{flex-shrink:0;padding:9px 14px;font-size:12px;}
-
-            /* Media card — full width */
-            .media-card{max-width:100%;border-radius:12px;}
-            /* Bigger touch targets for ▶ and ⛶ */
-            .vc{top:8px;right:8px;gap:6px;}
-            .vc button{width:42px;height:42px;font-size:17px;border-radius:8px;}
-            .dl-btn-wrap{padding:12px;}
-            .dl-btn-wrap button{padding:15px;font-size:16px;}
-
-            /* Caption */
-            .caption{font-size:13px;}
-
-            /* Ready card */
-            .ready-card{max-width:100%;border-radius:12px;}
-            .ready-card .rc-body{padding:16px 14px;}
-
-            /* Profile / playlist */
-            #profile-result h2{font-size:19px;}
-            #profile-result .sub{font-size:13px;margin-bottom:16px;}
-            .posts-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
-            .post-card .pc-body{padding:10px 10px;}
-            .post-card .pc-title{font-size:12px;}
-            .post-card .pc-desc{font-size:11px;-webkit-line-clamp:1;}
-            .post-card .pc-dl-btn{padding:10px 8px;font-size:13px;}
-            .post-card .pc-thumb .no-thumb{font-size:26px;}
-            .post-card .pc-thumb .play-overlay svg{width:38px;height:38px;}
-
-            /* Download All bar — stack everything */
-            .dl-all-bar{flex-direction:column;align-items:stretch;gap:8px;padding:12px;}
-            .dl-all-btn{justify-content:center;width:100%;}
-            .stop-all-btn{text-align:center;width:100%;}
-            .dl-progress-wrap{min-width:0;width:100%;}
-            .dl-progress-text{min-width:70px;font-size:12px;}
-            .yt-grid-quality{justify-content:center;}
-            .yt-grid-quality select{font-size:13px;padding:7px 10px;}
-
-            /* History */
-            .history-section{margin-top:20px;}
-            .history-item{padding:10px 12px;}
-
-            /* Lightbox close — bigger tap target on mobile */
-            .lightbox-close{top:14px;right:14px;width:44px;height:44px;font-size:22px;
-                display:flex;align-items:center;justify-content:center;
-                background:rgba(255,255,255,.15);border-radius:50%;}
+def download_pinterest(url):
+    """Download a Pinterest video or image pin using yt-dlp."""
+    try:
+        logger.info(f"📌 Pinterest download: {url}")
+        ydl_opts = {
+            'format':         'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
+            'merge_output_format': 'mp4',
         }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'jpg', 'jpeg', 'png', 'webp', 'mkv', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Pinterest: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'no video' in err or 'no media' in err:
+            return jsonify({'error': '🖼️ This pin has no downloadable video. Image-only pins are not supported yet.'}), 400
+        logger.warning(f"⚠️ Pinterest download failed: {e}")
+        return None
 
-        /* ── Very small phones (≤ 380px) ── */
-        @media (max-width:380px){
-            body{padding:16px 10px 36px;}
-            .posts-grid{grid-template-columns:1fr 1fr;gap:8px;}
-            .options-row{flex-direction:column;align-items:stretch;}
-            .options-row label{justify-content:center;}
-            .search-wrap h1{font-size:17px;}
+
+def download_youtube(url, quality='best', content_type='both'):
+    """Download a YouTube video/audio with the requested quality using yt-dlp."""
+    try:
+        is_audio = (content_type == 'audio' or quality == 'audio')
+        fmt      = YT_FORMATS['audio'] if is_audio else YT_FORMATS.get(quality, YT_FORMATS['best'])
+        logger.info(f"▶️ YouTube download: quality={quality} | fmt={fmt[:50]}")
+
+        ydl_opts = {
+            'format':         fmt,
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 120,
+            'retries':        3,
         }
-    </style>
-</head>
-<body>
+        if not is_audio:
+            ydl_opts['merge_output_format'] = 'mp4'
+        else:
+            ydl_opts['postprocessors'] = [{
+                'key':              'FFmpegExtractAudio',
+                'preferredcodec':   'mp3',
+                'preferredquality': '192',
+            }]
 
-<!-- Lightbox -->
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
-    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
-    <img id="lightbox-img" src="" alt="">
-</div>
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                # Extension may change after merge/conversion – scan alternatives
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ YouTube: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ YouTube download failed: {e}")
+        return None
 
-<!-- Search -->
-<div class="search-wrap">
-    <h1>📥 Media Downloader</h1>
-    <div class="brand-pills">
-        <span class="brand-pill pill-ig">📸 Instagram</span>
-        <span class="brand-pill pill-yt">▶️ YouTube</span>
-        <span class="brand-pill pill-tw">𝕏 Twitter/X</span>
-        <span class="brand-pill pill-pi">📌 Pinterest</span>
-    </div>
-    <div class="search-row">
-        <div class="input-wrap">
-            <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, Twitter/X, or Pinterest link…" autocomplete="off">
-            <!-- Paste button: shown when input is empty -->
-            <button class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
-            <!-- Clear button: shown when input has text -->
-            <button class="input-action-btn" id="clear-btn" title="Clear" onclick="clearInput()">✕</button>
-        </div>
-        <button id="search-btn" onclick="handleSearch()">
-            <span id="search-text">Search</span>
-            <span class="spin" id="search-spin"></span>
-        </button>
-    </div>
-    <div class="settings-row">
-        <div class="max-posts-row">
-            <span>Posts / videos:</span>
-            <select id="max-posts-select">
-                <option value="12">12</option>
-                <option value="25">25</option>
-                <option value="50" selected>50</option>
-                <option value="100">100</option>
-                <option value="200">200</option>
-                <option value="500">All (max 500)</option>
-            </select>
-        </div>
-        <button class="settings-btn" onclick="toggleSettings()">
-            <span class="cookie-badge" id="cookie-badge"></span>
-            ⚙️ Instagram Login
-        </button>
-    </div>
-</div>
 
-<!-- Settings / Cookie Panel -->
-<div class="settings-panel" id="settings-panel">
-    <h3>🍪 Instagram Session Cookie</h3>
-    <p class="hint">Required only for Instagram profiles (not for YouTube). Add your <strong>sessionid</strong> to fetch more than 12 posts.</p>
-    <div class="field-row">
-        <label>sessionid <span style="color:#e74c3c">*</span></label>
-        <input type="password" id="f-sessionid" placeholder="Paste your sessionid cookie value…">
-    </div>
-    <div class="field-row">
-        <label>csrftoken <span style="color:#999">(optional)</span></label>
-        <input type="text" id="f-csrftoken" placeholder="Paste your csrftoken…">
-    </div>
-    <div class="field-row">
-        <label>ds_user_id <span style="color:#999">(optional)</span></label>
-        <input type="text" id="f-ds_user_id" placeholder="Paste your ds_user_id…">
-    </div>
-    <div class="settings-actions">
-        <button class="save-cookie-btn" onclick="saveCookie()">💾 Save</button>
-        <button class="clear-cookie-btn" onclick="clearCookie()">🗑 Clear</button>
-        <span class="cookie-status-msg" id="cookie-save-msg">✅ Saved!</span>
-    </div>
-    <div class="how-to">
-        <strong>📖 How to get your Instagram session cookie (Chrome / Edge)</strong>
-        <ol>
-            <li>Open <a href="https://www.instagram.com" target="_blank">instagram.com</a> and log in.</li>
-            <li>Press <kbd>F12</kbd> → <strong>Application</strong> tab → <strong>Cookies → https://www.instagram.com</strong>.</li>
-            <li>Copy the <strong>sessionid</strong> value and paste above.</li>
-        </ol>
-    </div>
-</div>
+@app.route('/api/youtube/playlist', methods=['POST'])
+def get_youtube_playlist():
+    """Fetch video list from a YouTube playlist or channel."""
+    body       = request.json or {}
+    url        = body.get('url', '').strip()
+    max_videos = min(int(body.get('max_posts', 50)), 200)
 
-<div id="msg"></div>
+    if not ('youtube.com' in url or 'youtu.be' in url):
+        return jsonify({'error': 'Not a YouTube URL'}), 400
+    if not YTDLP_AVAILABLE:
+        return jsonify({'error': 'yt-dlp not available on this server'}), 500
 
-<!-- ── Single result (Instagram post OR YouTube video) ── -->
-<div id="single-result">
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-        <h2 id="s-title" style="margin-bottom:0;">Search result</h2>
-        <button class="copy-btn" id="s-title-copy" onclick="copyText(document.getElementById('s-title').textContent,this)" title="Copy title">⎘ Copy</button>
-    </div>
-    <p class="s-meta" id="s-meta"></p>
-
-    <!-- Instagram options -->
-    <div class="options-row" id="ig-options">
-        <label><input type="radio" name="ctype" value="both" checked> 📹🔊 Both</label>
-        <label><input type="radio" name="ctype" value="video"> 📹 Video</label>
-        <label><input type="radio" name="ctype" value="audio"> 🎵 Audio</label>
-    </div>
-
-    <!-- YouTube quality selector -->
-    <div class="yt-quality-row" id="yt-quality-row">
-        <button class="yt-q-btn active" data-q="best"  onclick="setYtQuality(this)">🏆 Best</button>
-        <button class="yt-q-btn"        data-q="1080p" onclick="setYtQuality(this)">🎥 1080p</button>
-        <button class="yt-q-btn"        data-q="720p"  onclick="setYtQuality(this)">📹 720p</button>
-        <button class="yt-q-btn"        data-q="480p"  onclick="setYtQuality(this)">📺 480p</button>
-        <button class="yt-q-btn"        data-q="360p"  onclick="setYtQuality(this)">📱 360p</button>
-        <button class="yt-q-btn"        data-q="audio" onclick="setYtQuality(this)">🎵 Audio MP3</button>
-    </div>
-
-    <!-- Twitter/X quality selector -->
-    <div class="yt-quality-row" id="tw-quality-row">
-        <button class="yt-q-btn tw-active" data-q="best"  onclick="setTwQuality(this)">🏆 Best</button>
-        <button class="yt-q-btn"           data-q="720p"  onclick="setTwQuality(this)">📹 720p</button>
-        <button class="yt-q-btn"           data-q="480p"  onclick="setTwQuality(this)">📺 480p</button>
-        <button class="yt-q-btn"           data-q="360p"  onclick="setTwQuality(this)">📱 360p</button>
-        <button class="yt-q-btn"           data-q="audio" onclick="setTwQuality(this)">🎵 Audio</button>
-    </div>
-
-    <div class="media-card">
-        <div class="thumb-wrap">
-            <img id="s-thumb" src="" alt="" style="display:none;">
-            <div class="vc" id="s-vc" style="display:none;">
-                <button title="Watch on platform" onclick="openPlay()">▶</button>
-                <button title="Expand thumbnail"  onclick="openLightbox()">⛶</button>
-            </div>
-        </div>
-        <div class="dl-btn-wrap">
-            <button id="s-dl-btn" onclick="singleDownload()">
-                <span id="s-dl-text">Download</span>
-                <span class="spin" id="s-dl-spin"></span>
-            </button>
-        </div>
-    </div>
-
-    <div class="copy-row caption" style="margin:0 auto 28px;max-width:640px;">
-        <div id="s-caption" style="flex:1;font-size:14px;color:#333;line-height:1.7;"></div>
-        <button class="copy-btn" id="s-caption-copy" onclick="copyText(document.getElementById('s-caption').textContent,this)" title="Copy description">⎘ Copy</button>
-    </div>
-
-    <div class="ready-card" id="ready-card" style="display:none;">
-        <div class="rc-thumb"><img id="rc-thumb" src="" alt="" style="display:none;"></div>
-        <div class="rc-body">
-            <h3>✅ Downloaded!</h3>
-            <div class="copy-row" id="rc-title-row" style="display:none;">
-                <div class="rc-title" id="rc-title"></div>
-                <button class="copy-btn" onclick="copyText(document.getElementById('rc-title').textContent,this)" title="Copy title">⎘ Copy</button>
-            </div>
-            <div class="copy-row" id="rc-caption-row" style="display:none;">
-                <div class="rc-caption" id="rc-caption"></div>
-                <button class="copy-btn" onclick="copyText(document.getElementById('rc-caption').textContent,this)" title="Copy description">⎘ Copy</button>
-            </div>
-            <hr class="rc-divider" id="rc-divider" style="display:none;">
-            <div class="rc-meta" id="rc-filename"></div>
-            <div class="rc-meta" id="rc-filesize"></div>
-            <a id="rc-link" href="#" download>↓ Download again</a>
-        </div>
-    </div>
-</div>
-
-<!-- ── Profile / Playlist grid ── -->
-<div id="profile-result">
-    <h2 id="pr-title">@username</h2>
-    <p class="sub" id="pr-sub"></p>
-
-    <div class="dl-all-bar" id="dl-all-bar">
-        <button class="dl-all-btn" id="dl-all-btn" onclick="downloadAll()">
-            <span class="dl-all-spin" id="dl-all-spin"></span>
-            📥 Download All
-        </button>
-        <button class="stop-all-btn" id="stop-all-btn" onclick="stopAll()" style="display:none;">⏹ Stop</button>
-        <!-- YouTube grid quality picker -->
-        <div class="yt-grid-quality" id="yt-grid-quality">
-            <span>Quality:</span>
-            <select id="yt-grid-q-select">
-                <option value="best">🏆 Best</option>
-                <option value="1080p">🎥 1080p</option>
-                <option value="720p" selected>📹 720p</option>
-                <option value="480p">📺 480p</option>
-                <option value="360p">📱 360p</option>
-                <option value="audio">🎵 Audio MP3</option>
-            </select>
-        </div>
-        <div class="dl-progress-wrap" id="dl-progress-wrap" style="visibility:hidden;">
-            <div class="dl-progress-bar"><div class="dl-progress-fill" id="dl-progress-fill"></div></div>
-            <span class="dl-progress-text" id="dl-progress-text">0 / 0</span>
-        </div>
-    </div>
-
-    <div class="posts-grid" id="posts-grid"></div>
-</div>
-
-<!-- History -->
-<div class="history-section">
-    <h3>Recent Downloads</h3>
-    <div id="history-list"><p style="color:#999;font-size:13px;">No downloads yet</p></div>
-</div>
-
-<script>
-let currentUrl      = '';
-let currentPlatform = 'instagram';   // 'instagram' | 'youtube' | 'twitter' | 'pinterest'
-let ytQuality       = 'best';        // active quality for single YT video
-let twQuality       = 'best';        // active quality for Twitter/X video
-let previewData     = null;
-let dlHistory = JSON.parse(localStorage.getItem('igDlHistory') || '[]').slice(0, 5);
-renderHistory();
-
-/* ─── COOKIE STATUS ──────────────────────────────────────────────────── */
-async function checkCookieStatus() {
-    try {
-        const r = await fetch('/api/cookie-status');
-        const d = await r.json();
-        const badge = document.getElementById('cookie-badge');
-        if (d.has_cookies) { badge.classList.add('ok'); badge.title = 'IG cookie set'; }
-        else               { badge.classList.remove('ok'); badge.title = 'No IG cookie'; }
-    } catch(e) {}
-}
-checkCookieStatus();
-
-function toggleSettings() {
-    const p = document.getElementById('settings-panel');
-    p.style.display = p.style.display === 'block' ? 'none' : 'block';
-}
-async function saveCookie() {
-    const sessionid = document.getElementById('f-sessionid').value.trim();
-    if (!sessionid) { alert('sessionid is required'); return; }
-    const r = await fetch('/api/set-cookie', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ sessionid, csrftoken: document.getElementById('f-csrftoken').value.trim(), ds_user_id: document.getElementById('f-ds_user_id').value.trim() }),
-    });
-    const d = await r.json();
-    if (d.success) { const m=document.getElementById('cookie-save-msg'); m.style.display='inline'; setTimeout(()=>m.style.display='none',3000); checkCookieStatus(); }
-    else alert('Error: '+d.error);
-}
-async function clearCookie() {
-    if (!confirm('Clear saved Instagram cookies?')) return;
-    await fetch('/api/set-cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionid:'_cleared_'})}).catch(()=>{});
-    ['f-sessionid','f-csrftoken','f-ds_user_id'].forEach(id=>document.getElementById(id).value='');
-    checkCookieStatus();
-}
-
-/* ─── YouTube quality ────────────────────────────────────────────────── */
-function setYtQuality(btn) {
-    document.querySelectorAll('#yt-quality-row .yt-q-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    ytQuality = btn.dataset.q;
-}
-
-/* ─── Twitter/X quality ──────────────────────────────────────────────── */
-function setTwQuality(btn) {
-    document.querySelectorAll('#tw-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','tw-active'));
-    btn.classList.add('tw-active');
-    twQuality = btn.dataset.q;
-}
-
-/* ─── SEARCH ─────────────────────────────────────────────────────────── */
-async function handleSearch() {
-    const url = document.getElementById('ig-url').value.trim();
-    if (!url) return showMsg('Please enter a URL', 'error');
-    if (!url.includes('instagram.com') && !url.includes('youtube.com') && !url.includes('youtu.be')
-        && !url.includes('twitter.com') && !url.includes('x.com')
-        && !url.includes('pinterest.com') && !url.includes('pinterest.co') && !url.includes('pin.it'))
-        return showMsg('Please paste an Instagram, YouTube, Twitter/X, or Pinterest link', 'error');
-
-    currentUrl = url;
-    setBusy('search', true);
-    hideMsg();
-    hide('single-result');
-    hide('profile-result');
-    document.getElementById('ready-card').style.display = 'none';
-
-    try {
-        const dr   = await post('/api/detect', { url });
-        const type = dr.url_type;
-
-        if (type === 'pinterest_post') {
-            currentPlatform = 'pinterest';
-            await loadSinglePost(url, 'pinterest');
-        } else if (type === 'pinterest_profile') {
-            showMsg('⚠️ Pinterest profile/board pages are not supported. Please paste a direct pin link — it should contain "/pin/" in the URL.', 'error');
-        } else if (type === 'twitter_profile') {
-            showMsg('⚠️ Twitter/X profile pages are not supported. Please paste a direct tweet link — it should contain "/status/" in the URL.', 'error');
-        } else if (type === 'twitter_video') {
-            currentPlatform = 'twitter';
-            await loadSinglePost(url, 'twitter');
-        } else if (type === 'yt_video') {
-            currentPlatform = 'youtube';
-            await loadSinglePost(url, 'youtube');
-        } else if (type === 'yt_playlist' || type === 'yt_channel') {
-            currentPlatform = 'youtube';
-            await loadYouTubePlaylist(url);
-        } else if (type === 'profile') {
-            currentPlatform = 'instagram';
-            await loadProfile(url);
-        } else {
-            currentPlatform = 'instagram';
-            await loadSinglePost(url, 'instagram');
+    try:
+        logger.info(f"📋 YouTube playlist/channel: {url}, max={max_videos}")
+        ydl_opts = {
+            'quiet':          True,
+            'no_warnings':    True,
+            'extract_flat':   'in_playlist',
+            'playlistend':    max_videos,
+            'socket_timeout': 30,
         }
-    } catch(e) {
-        showMsg('Error: ' + e.message, 'error');
-    } finally {
-        setBusy('search', false);
-    }
-}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-/* ─── YOUTUBE PLAYLIST / CHANNEL ─────────────────────────────────────── */
-async function loadYouTubePlaylist(url) {
-    const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
-    showMsg(`Fetching YouTube playlist / channel…`, 'info');
-    try {
-        const data = await post('/api/youtube/playlist', { url, max_posts });
-        if (!data.success) { showMsg(data.error || 'Could not load playlist', 'error'); return; }
+        if not info:
+            return jsonify({'error': 'Could not fetch YouTube content'}), 400
 
-        hideMsg();
-        window._postsMap = {};
-        data.videos.forEach(v => { window._postsMap[v.id] = v; });
+        entries = info.get('entries') or []
+        videos  = []
+        for entry in entries:
+            if not entry:
+                continue
+            vid_id    = entry.get('id', '')
+            if not vid_id:
+                continue
+            vid_url   = f'https://www.youtube.com/watch?v={vid_id}'
+            # Prefer maxresdefault (1280×720); hqdefault (480×360) always exists as fallback
+            thumb = (entry.get('thumbnail')
+                     or f'https://i.ytimg.com/vi/{vid_id}/maxresdefault.jpg')
+            videos.append({
+                'id':          vid_id,
+                'url':         vid_url,
+                'title':       entry.get('title', 'Unknown'),
+                'description': entry.get('description', ''),
+                'thumbnail':   thumb,
+                'duration':    _fmt_dur(entry.get('duration')),
+                'is_video':    True,
+                'platform':    'youtube',
+                'uploader':    entry.get('uploader', '') or entry.get('channel', ''),
+            })
 
-        document.getElementById('pr-title').textContent = data.title || 'YouTube Playlist';
-        document.getElementById('pr-sub').textContent   =
-            `${data.count} videos${data.uploader ? ' · ' + data.uploader : ''}`;
+        title    = info.get('title', 'YouTube')
+        uploader = info.get('uploader', '') or info.get('channel', '')
+        logger.info(f"✅ YouTube: {len(videos)} videos from '{title}'")
+        return jsonify({
+            'success':  True,
+            'title':    title,
+            'uploader': uploader,
+            'count':    len(videos),
+            'videos':   videos,
+        })
+    except Exception as e:
+        logger.error(f"❌ YouTube playlist error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 400
 
-        // Show YouTube quality picker and colour the Download All button red
-        document.getElementById('yt-grid-quality').classList.add('show');
-        document.getElementById('dl-all-btn').classList.add('yt-dl-btn');
 
-        document.getElementById('posts-grid').innerHTML = data.videos.map(v => postCardHTML(v)).join('');
-        show('profile-result');
-    } catch(e) {
-        showMsg('Playlist load failed: ' + e.message, 'error');
-    }
-}
+# ── Shortcode helpers ────────────────────────────────────────────────────────
 
-/* ─── INSTAGRAM PROFILE ───────────────────────────────────────────────── */
-async function loadProfile(url) {
-    const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
-    showMsg(`Fetching up to ${max_posts} Instagram posts…`, 'info');
-    try {
-        const data = await post('/api/profile', { url, max_posts });
-        if (!data.success) {
-            let errHtml = esc(data.error || 'Could not load profile');
-            if (data.needs_cookie)
-                errHtml += ' <button onclick="toggleSettings();document.getElementById(\'settings-panel\').scrollIntoView({behavior:\'smooth\'})" style="margin-left:8px;padding:4px 12px;font-size:12px;background:#3d82f7;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚙️ Login</button>';
-            showMsgHtml(errHtml, 'error');
-            return;
+_SHORTCODE_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
+def shortcode_to_media_pk(shortcode):
+    """Convert an Instagram shortcode (e.g. 'DWp3ZD9FAmR') to its numeric media ID."""
+    media_id = 0
+    for char in shortcode:
+        media_id = media_id * 64 + _SHORTCODE_ALPHABET.index(char)
+    return media_id
+
+def _extract_shortcode(url):
+    """Return the shortcode portion of an Instagram post/reel/tv URL."""
+    for seg in ('/p/', '/reel/', '/tv/'):
+        if seg in url:
+            return url.split(seg)[1].split('/')[0].split('?')[0]
+    return None
+
+def _download_cdn_image(img_url, shortcode):
+    """Fetch an image from Instagram CDN with proper Referer + session cookie headers."""
+    try:
+        cookies = load_cookies()
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Referer':    'https://www.instagram.com/',
+            'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
         }
-        hideMsg();
-        window._postsMap = {};
-        data.posts.forEach(p => { window._postsMap[p.id] = p; });
+        if cookies:
+            headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
 
-        document.getElementById('pr-title').textContent = '@' + data.username;
-        let subText = `${data.count} posts loaded`;
-        if (data.count <= 12 && data.count < max_posts)
-            subText += ' — add a session cookie in ⚙️ Login to fetch more';
-        else if (data.count < max_posts)
-            subText += ' (reached end of profile)';
-        document.getElementById('pr-sub').textContent = subText;
+        resp = requests.get(img_url, headers=headers, timeout=60, stream=True)
+        if resp.status_code != 200:
+            logger.warning(f"⚠️ CDN returned {resp.status_code}")
+            return None
 
-        // Reset YouTube styling
-        document.getElementById('yt-grid-quality').classList.remove('show');
-        document.getElementById('dl-all-btn').classList.remove('yt-dl-btn');
+        ct  = resp.headers.get('Content-Type', 'image/jpeg')
+        ext = 'png' if 'png' in ct else 'jpg'
+        filename = os.path.join(DOWNLOAD_FOLDER, f"{shortcode}_{int(time.time())}.{ext}")
 
-        document.getElementById('posts-grid').innerHTML = data.posts.map(p => postCardHTML(p)).join('');
-        show('profile-result');
-    } catch(e) {
-        showMsg('Profile load failed: ' + e.message, 'error');
-    }
-}
+        with open(filename, 'wb') as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
 
-/* ─── POST CARD ───────────────────────────────────────────────────────── */
-function thumbUrl(raw) {
-    if (!raw) return '';
-    // YouTube / Google CDN thumbnails are publicly accessible — load directly for speed
-    if (raw.includes('ytimg.com') || raw.includes('ggpht.com') || raw.includes('googleusercontent.com')) {
-        return raw;
-    }
-    // Instagram / Facebook CDN requires backend proxy (Referer + CORS restrictions)
-    return '/api/thumbnail?url=' + encodeURIComponent(raw);
-}
+        if os.path.exists(filename) and os.path.getsize(filename) > 0:
+            file_size = os.path.getsize(filename)
+            logger.info(f"✅ Photo saved: {os.path.basename(filename)} ({file_size/1024:.1f} KB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size / (1024*1024):.2f} MB",
+            })
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ CDN image download failed: {e}")
+        return None
 
-function postCardHTML(p) {
-    const isYt    = p.platform === 'youtube';
-    const isVid   = p.is_video || isYt;
-    const badge   = isYt ? '▶️ YouTube' : (isVid ? '📹 Video' : '📸 Photo');
-    const dur     = p.duration ? `<span class="pc-dur">${esc(p.duration)}</span>` : '';
-    const title   = p.title || '';
-    const desc    = p.description || '';
-    const safeId  = esc(p.id);
-    const proxyThumb = p.thumbnail ? thumbUrl(p.thumbnail) : '';
-    const cardCls = isYt ? 'yt-card' : 'ig-card';
 
-    const imgHtml = proxyThumb
-        ? `<div class="thumb-loading" id="tl-${safeId}"></div>
-           <img src="${proxyThumb}" alt=""
-                onload="var e=document.getElementById('tl-${safeId}');if(e)e.style.display='none';"
-                onerror="
-                    var e=document.getElementById('tl-${safeId}');if(e)e.style.display='none';
-                    if(this.src.includes('maxresdefault')){
-                        this.src=this.src.replace('maxresdefault','hqdefault');
-                    } else {
-                        this.style.display='none';
-                        var n=document.getElementById('nt-${safeId}');if(n)n.style.display='flex';
-                    }">`
-        : '';
+# ── Public helpers (no auth needed) ─────────────────────────────────────────
 
-    const noThumb = `<div class="no-thumb" id="nt-${safeId}" style="display:${proxyThumb?'none':'flex'}">
-        ${isYt ? '▶️' : (isVid ? '🎬' : '📷')}<span>No preview</span>
-    </div>`;
-
-    const playOverlay = `<div class="play-overlay">
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="40" cy="40" r="38" fill="rgba(0,0,0,.45)" stroke="rgba(255,255,255,.7)" stroke-width="2"/>
-            <polygon points="32,24 60,40 32,56" fill="white"/>
-        </svg>
-    </div>`;
-
-    const uploader = p.uploader ? `<div class="pc-uploader">📺 ${esc(p.uploader)}</div>` : '';
-
-    // Show title bold + description below; fall back gracefully
-    const titleHtml = title
-        ? `<div class="copy-row"><div class="pc-title">${esc(title)}</div><button class="copy-btn" data-copy="${esc(title)}" onclick="copyText(this.dataset.copy,this)" title="Copy title">⎘ Copy</button></div>`
-        : '';
-    const descHtml = desc && desc !== title
-        ? `<div class="copy-row"><div class="pc-desc">${esc(desc)}</div><button class="copy-btn" data-copy="${esc(desc)}" onclick="copyText(this.dataset.copy,this)" title="Copy description">⎘ Copy</button></div>`
-        : (!title ? `<div class="pc-desc" style="color:#aaa;font-style:italic;">No description</div>` : '');
-
-    return `
-    <div class="post-card ${cardCls}" id="card-${safeId}">
-        <div class="pc-thumb">
-            ${imgHtml}${noThumb}${playOverlay}
-            <span class="pc-badge">${badge}</span>${dur}
-        </div>
-        <div class="pc-body">
-            ${uploader}
-            ${titleHtml}${descHtml}
-            <button class="pc-dl-btn" id="btn-${safeId}" onclick="downloadPost('${safeId}')">
-                <span id="btn-txt-${safeId}">📥 Download</span>
-                <span class="spin" id="spin-${safeId}"></span>
-            </button>
-        </div>
-    </div>`;
-}
-
-/* ─── BROWSER SAVE DIALOG ────────────────────────────────────────────── */
-function triggerBrowserDownload(filename) {
-    const a = document.createElement('a');
-    a.href = '/api/file/' + encodeURIComponent(filename);
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
-
-/* ─── PER-CARD DOWNLOAD ──────────────────────────────────────────────── */
-async function downloadPost(id) {
-    const p   = (window._postsMap || {})[id];
-    const url = p ? p.url : '';
-    if (!url) { showMsg('Post data not found, please refresh.', 'error'); return; }
-
-    const btn  = document.getElementById('btn-'     + id);
-    const txt  = document.getElementById('btn-txt-' + id);
-    const spin = document.getElementById('spin-'    + id);
-    if (!btn) return;
-
-    btn.disabled = true;
-    if (spin) spin.style.display = 'block';
-    if (txt)  txt.textContent    = 'Downloading…';
-
-    // Build request body
-    const isYt = p.platform === 'youtube';
-    const body = isYt
-        ? { url, quality: document.getElementById('yt-grid-q-select').value }
-        : { url, content_type: 'both' };
-
-    try {
-        const data = await post('/api/download', body);
-        if (data.success) {
-            triggerBrowserDownload(data.filename);
-            addHistory({ filename: data.filename, size: data.file_size, url, time: new Date().toLocaleString() });
-            btn.disabled = false;
-            btn.classList.add('dl-done');
-            if (txt) txt.textContent = '✅ Saved!';
-            setTimeout(() => { btn.classList.remove('dl-done'); if (txt) txt.textContent = '📥 Download'; }, 3500);
-        } else {
-            btn.disabled = false;
-            if (txt) txt.textContent = '📥 Download';
-            showMsg(data.error || 'Download failed', 'error');
+def _fetch_image_from_embed(shortcode):
+    """
+    Hit Instagram's embed endpoint – publicly accessible, no cookies needed.
+    Returns a CDN image URL string or None.
+    """
+    import re
+    try:
+        embed_url = f'https://www.instagram.com/p/{shortcode}/embed/captioned/'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/124.0.0.0 Safari/537.36',
+            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer':         'https://www.instagram.com/',
         }
-    } catch(e) {
-        btn.disabled = false;
-        if (txt) txt.textContent = '📥 Download';
-        showMsg('Error: ' + e.message, 'error');
-    } finally {
-        if (spin) spin.style.display = 'none';
-    }
-}
+        resp = requests.get(embed_url, headers=headers, timeout=20)
+        logger.info(f"   Embed endpoint status: {resp.status_code}")
+        if resp.status_code != 200:
+            return None
+        html = resp.text
+        # Patterns from most- to least-specific
+        patterns = [
+            # Dedicated embed image class
+            r'<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^"]+)"',
+            r'<img[^>]+src="([^"]+)"[^>]+class="[^"]*EmbeddedMediaImage[^"]*"',
+            # Any scontent/cdninstagram image
+            r'<img[^>]+src="(https://[^"]*(?:scontent|cdninstagram)[^"]*\.(?:jpg|png|jpeg)[^"]*)"',
+            # JSON blob inside embed HTML
+            r'"display_url"\s*:\s*"(https://[^"]+)"',
+            r'"thumbnail_src"\s*:\s*"(https://[^"]+)"',
+            # CSS background
+            r'background-image:\s*url\([\'"]?(https://[^\'")]+)[\'"]?\)',
+        ]
+        for pat in patterns:
+            m = re.search(pat, html)
+            if m:
+                img_url = _unescape_url(m.group(1))
+                logger.info(f"   Embed → image URL found")
+                return img_url
+        logger.warning("   Embed: page fetched but no image URL matched")
+    except Exception as e:
+        logger.warning(f"⚠️ Embed fetch failed: {e}")
+    return None
 
-/* ─── DOWNLOAD ALL ───────────────────────────────────────────────────── */
-let _stopRequested = false;
-async function downloadAll() {
-    const ids = Object.keys(window._postsMap || {});
-    if (!ids.length) return;
-    _stopRequested = false;
-    const total = ids.length; let done = 0, failed = 0;
-    const allBtn=document.getElementById('dl-all-btn'), stopBtn=document.getElementById('stop-all-btn'),
-          spin=document.getElementById('dl-all-spin'), wrap=document.getElementById('dl-progress-wrap'),
-          fill=document.getElementById('dl-progress-fill'), txt=document.getElementById('dl-progress-text');
-    allBtn.disabled=true; allBtn.classList.remove('dl-done'); spin.style.display='inline-block';
-    stopBtn.style.display='inline-block'; wrap.style.visibility='visible';
-    fill.classList.remove('done'); fill.style.width='0%'; txt.textContent=`0 / ${total}`;
-    for (const id of ids) {
-        if (_stopRequested) break;
-        txt.textContent = `Downloading ${done+1} / ${total}…`;
-        try { await downloadPost(id); done++; } catch(e) { failed++; }
-        fill.style.width=`${Math.round(((done+failed)/total)*100)}%`;
-        txt.textContent=`${done+failed} / ${total}`;
-        if (!_stopRequested) await new Promise(r=>setTimeout(r,900));
-    }
-    spin.style.display='none'; stopBtn.style.display='none'; allBtn.disabled=false;
-    if (_stopRequested) {
-        allBtn.textContent='📥 Download All'; txt.textContent=`Stopped — ${done} downloaded`;
-        stopBtn.disabled=false; stopBtn.textContent='⏹ Stop';
-    } else {
-        fill.classList.add('done'); allBtn.classList.add('dl-done');
-        allBtn.innerHTML='✅ All Downloaded!';
-        txt.textContent=failed?`${done} done, ${failed} failed`:`✅ ${done} / ${total} saved`;
-        setTimeout(()=>{ allBtn.classList.remove('dl-done'); allBtn.innerHTML='<span class="dl-all-spin" id="dl-all-spin" style="display:none;"></span>📥 Download All'; fill.classList.remove('done'); },5000);
-    }
-}
-function stopAll() { _stopRequested=true; document.getElementById('stop-all-btn').disabled=true; document.getElementById('stop-all-btn').textContent='Stopping…'; }
 
-/* ─── SINGLE POST MODE ───────────────────────────────────────────────── */
-async function loadSinglePost(url, platform) {
-    showMsg('Loading preview…', 'info');
-    const igOpts = document.getElementById('ig-options');
-    const ytOpts = document.getElementById('yt-quality-row');
-    const twOpts = document.getElementById('tw-quality-row');
-    const dlBtn  = document.getElementById('s-dl-btn');
-
-    // Reset all selectors
-    igOpts.style.display = 'none';
-    ytOpts.classList.remove('show');
-    twOpts.classList.remove('show');
-    dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn');
-
-    if (platform === 'youtube') {
-        ytOpts.classList.add('show');
-        dlBtn.classList.add('yt-btn');
-    } else if (platform === 'twitter') {
-        twOpts.classList.add('show');
-        dlBtn.classList.add('tw-btn');
-    } else if (platform === 'pinterest') {
-        dlBtn.classList.add('pi-btn');   // Pinterest red, no quality selector
-    } else {
-        igOpts.style.display = 'flex';
-    }
-
-    try {
-        const data = await post('/api/preview', { url });
-        if (data.success && data.preview) {
-            previewData = data.preview;
-            showSinglePreview(previewData);
-            hideMsg();
-        } else {
-            previewData = null;
-            showSinglePreview({ thumbnail: null, description: '', is_video: true });
-            showMsg('Preview not available — you can still download.', 'info');
+def _fetch_oembed_thumbnail(shortcode):
+    """
+    Use Instagram's public oEmbed API – returns a thumbnail_url (lower-res but reliable).
+    No authentication required.
+    """
+    try:
+        oembed_url = (f'https://www.instagram.com/api/v1/oembed/'
+                      f'?url=https://www.instagram.com/p/{shortcode}/&hidecaption=0')
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Referer':    'https://www.instagram.com/',
         }
-    } catch(e) {
-        previewData = null;
-        showSinglePreview({ thumbnail: null, description: '', is_video: true });
-    }
-}
+        resp = requests.get(oembed_url, headers=headers, timeout=20)
+        logger.info(f"   oEmbed status: {resp.status_code}")
+        if resp.status_code == 200:
+            data = resp.json()
+            thumb = data.get('thumbnail_url')
+            if thumb:
+                logger.info("   oEmbed → thumbnail URL found")
+                return thumb
+    except Exception as e:
+        logger.warning(f"⚠️ oEmbed fetch failed: {e}")
+    return None
 
-function showSinglePreview(p) {
-    const thumb    = document.getElementById('s-thumb');
-    const thumbWrap = document.querySelector('.thumb-wrap');
 
-    // Set aspect ratio based on platform / content type
-    if (thumbWrap) {
-        thumbWrap.classList.remove('ratio-16-9', 'ratio-1-1');
-        thumbWrap.classList.add((currentPlatform === 'youtube' || currentPlatform === 'twitter') ? 'ratio-16-9' : 'ratio-1-1');
-    }
+def _unescape_url(url):
+    """Decode HTML entities and JSON escapes in a URL string."""
+    return (url
+            .replace('&amp;', '&')
+            .replace('\\u0026', '&')
+            .replace('\\/', '/'))
 
-    if (p.thumbnail) {
-        thumb.src = thumbUrl(p.thumbnail);
-        thumb.style.display = 'block';
-    } else {
-        thumb.style.display = 'none';
-    }
 
-    document.getElementById('s-vc').style.display    = p.is_video ? 'flex' : 'none';
-    document.getElementById('s-title').textContent   = p.title || 'Result';
-    document.getElementById('s-meta').textContent    = p.uploader ? '📺 ' + p.uploader : '';
-    document.getElementById('s-title-copy').style.display = p.title ? 'inline-flex' : 'none';
+# ── Dedicated photo downloader ───────────────────────────────────────────────
 
-    // Show description separately from title
-    const captionEl = document.getElementById('s-caption');
-    const desc = p.description || '';
-    const title = p.title || '';
-    captionEl.textContent = (desc && desc !== title) ? desc : '';
-    document.getElementById('s-caption-copy').style.display = (desc && desc !== title) ? 'inline-flex' : 'none';
+def download_instagram_photo(url):
+    """
+    Download a photo post.  Methods tried in order:
+      A) Instagram internal /media/{pk}/info/ API  (only if session cookie is set)
+      B) Instagram embed endpoint                  (public – no auth needed)
+      C) oEmbed thumbnail API                      (public – no auth, lower-res)
+      D) Page scrape (display_url / og:image)      (may work for some posts)
+    """
+    import re
+    shortcode = _extract_shortcode(url)
+    if not shortcode:
+        return None
 
-    // Text-only tweet — disable download button and show notice
-    const dlBtn  = document.getElementById('s-dl-btn');
-    const dlText = document.getElementById('s-dl-text');
-    if (p.no_video) {
-        dlBtn.disabled = true;
-        dlText.textContent = '📝 Text-only tweet — no video';
-        showMsg('This tweet contains text only. There is no video or image to download.', 'info');
-    } else {
-        dlBtn.disabled = false;
-        dlText.textContent = 'Download';
-    }
+    logger.info(f"📸 Photo downloader for shortcode: {shortcode}")
 
-    show('single-result');
-    setTimeout(() => document.getElementById('single-result').scrollIntoView({ behavior: 'smooth' }), 80);
-}
+    # ── Method A: internal API (requires session cookie) ─────────────────
+    if cookies_are_set():
+        try:
+            media_pk = shortcode_to_media_pk(shortcode)
+            api_resp = requests.get(
+                f'https://www.instagram.com/api/v1/media/{media_pk}/info/',
+                headers=get_session_headers(), timeout=20,
+            )
+            logger.info(f"   Internal API status: {api_resp.status_code}")
+            if api_resp.status_code == 200 and api_resp.text.strip():
+                item      = (api_resp.json().get('items') or [{}])[0]
+                media_type = item.get('media_type')  # 1=photo, 2=video, 8=album
+                if media_type == 2:
+                    logger.info("⏭️  Photo downloader: media is a video – skipping")
+                    return None
+                candidates = item.get('image_versions2', {}).get('candidates', [])
+                if candidates:
+                    candidates.sort(key=lambda x: x.get('width', 0) * x.get('height', 0), reverse=True)
+                    img_url = candidates[0]['url']
+                    logger.info(f"   Internal API → {candidates[0].get('width')}×{candidates[0].get('height')} image")
+                    result = _download_cdn_image(img_url, shortcode)
+                    if result:
+                        return result
+        except Exception as e:
+            logger.warning(f"⚠️ Photo internal API failed: {e}")
+    else:
+        logger.info("   Internal API: no session cookie – skipping")
 
-async function singleDownload() {
-    const dlBtn  = document.getElementById('s-dl-btn');
-    const dlText = document.getElementById('s-dl-text');
-    setBusy('s-dl', true);
-    document.getElementById('ready-card').style.display = 'none';
-    hideMsg();
+    # ── Method B: public embed endpoint ─────────────────────────────────
+    try:
+        img_url = _fetch_image_from_embed(shortcode)
+        if img_url:
+            result = _download_cdn_image(img_url, shortcode)
+            if result:
+                return result
+    except Exception as e:
+        logger.warning(f"⚠️ Embed method failed: {e}")
 
-    const body = currentPlatform === 'youtube'
-        ? { url: currentUrl, quality: ytQuality }
-        : currentPlatform === 'twitter'
-        ? { url: currentUrl, quality: twQuality }
-        : currentPlatform === 'pinterest'
-        ? { url: currentUrl }
-        : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
+    # ── Method C: public oEmbed thumbnail ───────────────────────────────
+    try:
+        img_url = _fetch_oembed_thumbnail(shortcode)
+        if img_url:
+            result = _download_cdn_image(img_url, shortcode)
+            if result:
+                return result
+    except Exception as e:
+        logger.warning(f"⚠️ oEmbed method failed: {e}")
 
-    try {
-        const data = await post('/api/download', body);
-        if (data.success) {
-            triggerBrowserDownload(data.filename);
-            addHistory({ filename: data.filename, size: data.file_size, url: currentUrl, time: new Date().toLocaleString() });
-            setBusy('s-dl', false);
-            dlBtn.classList.add('dl-done');
-            dlText.textContent = '✅ Downloaded!';
-            setTimeout(() => { dlBtn.classList.remove('dl-done'); dlText.textContent = 'Download'; }, 3500);
-            showReadyCard(data);
-        } else {
-            showMsg(data.error || 'Download failed. Try again.', 'error');
+    # ── Method D: post page scrape ───────────────────────────────────────
+    try:
+        page_resp = requests.get(
+            url,
+            headers=get_session_headers({'User-Agent': get_random_user_agent()}),
+            timeout=20,
+        )
+        logger.info(f"   Page scrape status: {page_resp.status_code}")
+        if page_resp.status_code == 200:
+            html = page_resp.text
+            patterns = [
+                r'"display_url"\s*:\s*"(https://[^"]+)"',
+                r'"thumbnail_src"\s*:\s*"(https://[^"]+)"',
+                r'<meta property="og:image" content="([^"]+)"',
+                r'<meta content="([^"]+)" property="og:image"',
+                r'<img[^>]+src="(https://[^"]*(?:scontent|cdninstagram)[^"]+\.(?:jpg|png))[^"]*"',
+            ]
+            matched = False
+            for pat in patterns:
+                m = re.search(pat, html)
+                if m:
+                    img_url = _unescape_url(m.group(1))
+                    logger.info(f"   Page scrape → image URL found (pattern: {pat[:40]}…)")
+                    result = _download_cdn_image(img_url, shortcode)
+                    if result:
+                        return result
+                    matched = True  # pattern matched but CDN download failed
+            if not matched:
+                logger.warning("   Page scrape: no image URL patterns matched the HTML")
+    except Exception as e:
+        logger.warning(f"⚠️ Photo page scrape failed: {e}")
+
+    logger.warning(f"⚠️ All photo download methods exhausted for {shortcode}")
+    return None
+
+
+# ── Video downloaders ────────────────────────────────────────────────────────
+
+def download_with_instagrapi(url, content_type='both'):
+    """Download using Instagrapi – uses media_pk_from_code() for proper shortcode→ID."""
+    try:
+        logger.info(f"📱 Downloading with Instagrapi (content: {content_type})...")
+        shortcode = _extract_shortcode(url)
+        if not shortcode:
+            raise Exception("Could not extract shortcode from URL")
+
+        client = Client()
+
+        # Convert shortcode → numeric media PK (fixes 'invalid literal for int()' error)
+        try:
+            media_pk = client.media_pk_from_code(shortcode)
+        except Exception:
+            media_pk = shortcode_to_media_pk(shortcode)
+
+        media = client.media_info(media_pk)
+
+        if media.is_video:
+            logger.info(f"📹 Video detected: {shortcode}")
+            if content_type == 'audio':
+                temp_video = os.path.join(DOWNLOAD_FOLDER, f"{shortcode}_temp.mp4")
+                filename   = os.path.join(DOWNLOAD_FOLDER, f"{shortcode}_audio.mp3")
+                client.video_download(media_pk, temp_video)
+                try:
+                    import subprocess
+                    subprocess.run(
+                        ['ffmpeg', '-i', temp_video, '-q:a', '0', '-map', 'a', filename, '-y'],
+                        capture_output=True, timeout=300,
+                    )
+                    if os.path.exists(temp_video):
+                        os.remove(temp_video)
+                except Exception:
+                    filename = os.path.join(DOWNLOAD_FOLDER, f"{shortcode}.mp4")
+                    if os.path.exists(temp_video):
+                        os.rename(temp_video, filename)
+            else:
+                filename = os.path.join(DOWNLOAD_FOLDER, f"{shortcode}.mp4")
+                client.video_download(media_pk, filename)
+        else:
+            logger.info(f"📸 Photo detected: {shortcode}")
+            filename = os.path.join(DOWNLOAD_FOLDER, f"{shortcode}.jpg")
+            client.photo_download(media_pk, filename)
+
+        if os.path.exists(filename):
+            file_size = os.path.getsize(filename)
+            logger.info(f"✅ Downloaded: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size/(1024*1024):.2f} MB",
+            })
+        return None
+
+    except Exception as e:
+        logger.warning(f"⚠️ Instagrapi failed: {str(e)}")
+        return None
+
+
+def download_with_ytdlp(url, format_id='best', content_type='both'):
+    """Download using yt-dlp. On 'no video' error, delegates to download_instagram_photo()."""
+    try:
+        logger.info(f"🔄 Downloading with yt-dlp (content: {content_type})...")
+
+        if content_type == 'video':
+            format_str = 'bestvideo[ext=mp4]/best[ext=mp4]'
+        elif content_type == 'audio':
+            format_str = 'bestaudio[ext=m4a]/bestaudio'
+        else:
+            format_str = format_id
+
+        ydl_opts = {
+            'format':       format_str,
+            'outtmpl':      os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':        True,
+            'no_warnings':  True,
+            'socket_timeout': 90,
+            'http_headers': {
+                'User-Agent':      get_random_user_agent(),
+                'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+            },
+            'retries': 2,
+            'skip_unavailable_fragments': True,
         }
-    } catch(e) {
-        showMsg('Connection error: ' + e.message, 'error');
-    } finally {
-        setBusy('s-dl', false);
-    }
-}
+        if os.path.exists(NETSCAPE_COOKIES_FILE):
+            ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
 
-function showReadyCard(data) {
-    const rc = document.getElementById('ready-card');
-    const rcThumb = document.getElementById('rc-thumb');
-    if (previewData?.thumbnail) { rcThumb.src = thumbUrl(previewData.thumbnail); rcThumb.style.display = 'block'; }
-    else { rcThumb.style.display = 'none'; }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                # yt-dlp may change extension; scan for actual file
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'jpg', 'jpeg', 'png', 'webp', 'mkv', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Downloaded: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
 
-    // Title (bold header)
-    const titleEl = document.getElementById('rc-title');
-    const title = previewData?.title || '';
-    titleEl.textContent = title;
-    document.getElementById('rc-title-row').style.display = title ? 'flex' : 'none';
+    except Exception as e:
+        err = str(e)
+        # yt-dlp raises this for photo posts – hand off to the dedicated photo handler
+        if 'no video' in err.lower():
+            logger.info("📸 yt-dlp: no video in post – delegating to photo downloader")
+            return download_instagram_photo(url)
+        logger.warning(f"⚠️ yt-dlp failed: {err}")
+        return None
 
-    // Description (body text) — only show if different from title
-    const descEl = document.getElementById('rc-caption');
-    const desc = previewData?.description || '';
-    descEl.textContent = desc;
-    document.getElementById('rc-caption-row').style.display = desc ? 'flex' : 'none';
 
-    // Divider — show only if we have at least one of title/description
-    document.getElementById('rc-divider').style.display = (title || desc) ? 'block' : 'none';
+def download_direct_http(url, content_type='both'):
+    """Last-resort: scrape og:video / og:image from the post page and download directly."""
+    import re
+    try:
+        logger.info(f"🌐 Trying direct HTTP download (content: {content_type})...")
+        headers  = get_session_headers({'User-Agent': get_random_user_agent()})
+        response = requests.get(url, headers=headers, timeout=30)
 
-    document.getElementById('rc-filename').textContent = '📄 ' + data.filename;
-    document.getElementById('rc-filesize').textContent = '📦 ' + data.file_size;
-    const link = document.getElementById('rc-link');
-    link.href = '/api/file/' + encodeURIComponent(data.filename);
-    link.download = data.filename;
-    rc.style.display = 'block';
-    rc.scrollIntoView({ behavior: 'smooth' });
-}
+        if response.status_code != 200:
+            logger.warning(f"⚠️ Direct HTTP: page returned {response.status_code}")
+            return None
 
-/* ─── COPY TEXT ──────────────────────────────────────────────────────── */
-function copyText(text, btn) {
-    if (!text || !text.trim()) return;
-    const doFlash = () => {
-        if (!btn) return;
-        const orig = btn.innerHTML;
-        btn.innerHTML = '✓ Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
-    };
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text.trim()).then(doFlash).catch(() => _copyFallback(text, doFlash));
-    } else {
-        _copyFallback(text, doFlash);
-    }
-}
-function _copyFallback(text, cb) {
-    const ta = document.createElement('textarea');
-    ta.value = text.trim();
-    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    try { document.execCommand('copy'); cb(); } catch(e) {}
-    document.body.removeChild(ta);
-}
+        logger.info("✅ Page fetched successfully")
+        html = response.text
 
-/* ─── PLAY & LIGHTBOX ────────────────────────────────────────────────── */
-function openPlay() {
-    if (currentUrl) window.open(currentUrl, '_blank', 'noopener');
-}
-function openLightbox() {
-    const thumb = document.getElementById('s-thumb');
-    if (!thumb || !thumb.src || thumb.style.display === 'none') return;
-    document.getElementById('lightbox-img').src = thumb.src;
-    document.getElementById('lightbox').classList.add('show');
-    document.body.style.overflow = 'hidden';
-}
-function closeLightbox() {
-    document.getElementById('lightbox').classList.remove('show');
-    document.body.style.overflow = '';
-}
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+        # ── Video ──
+        if content_type != 'audio':
+            for pat in [
+                r'<meta property="og:video" content="([^"]+)"',
+                r'<meta content="([^"]+)" property="og:video"',
+                r'"video_url"\s*:\s*"(https://[^"]+)"',
+            ]:
+                m = re.search(pat, html)
+                if m:
+                    video_url = _unescape_url(m.group(1))
+                    logger.info("📹 Video URL found via Direct HTTP")
+                    return _download_raw_url(video_url, 'mp4')
 
-/* ─── HELPERS ────────────────────────────────────────────────────────── */
-async function post(endpoint, body) {
-    const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    return r.json();
-}
-function showMsg(txt,type){const el=document.getElementById('msg');el.textContent=txt;el.className=type;el.style.display='block';}
-function showMsgHtml(html,type){const el=document.getElementById('msg');el.innerHTML=html;el.className=type;el.style.display='block';}
-function hideMsg(){document.getElementById('msg').style.display='none';}
-function show(id){document.getElementById(id).style.display='block';}
-function hide(id){document.getElementById(id).style.display='none';}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function setBusy(prefix,on){
-    const btn=document.getElementById(prefix+'-btn')||document.getElementById(prefix+'-dl-btn');
-    const text=document.getElementById(prefix+'-text')||document.getElementById(prefix+'-dl-text');
-    const spin=document.getElementById(prefix+'-spin')||document.getElementById(prefix+'-dl-spin');
-    if(btn)btn.disabled=on;
-    if(text)text.textContent=on?'Loading…':(prefix==='search'?'Search':'Download');
-    if(spin)spin.style.display=on?'block':'none';
-}
-function addHistory(h){dlHistory.unshift(h);dlHistory=dlHistory.slice(0,5);localStorage.setItem('igDlHistory',JSON.stringify(dlHistory));renderHistory();}
-function renderHistory(){
-    const el=document.getElementById('history-list');
-    if(!dlHistory.length){el.innerHTML='<p style="color:#999;font-size:13px;">No downloads yet</p>';return;}
-    el.innerHTML=dlHistory.map(h=>`<div class="history-item"><strong>${esc(h.filename)}</strong><small>${esc(h.size)} · ${esc(h.time)}</small></div>`).join('');
-}
-/* ─── PASTE / CLEAR INPUT ────────────────────────────────────────────── */
-function _syncInputBtns() {
-    const hasText = document.getElementById('ig-url').value.length > 0;
-    document.getElementById('paste-btn').classList.toggle('visible', !hasText);
-    document.getElementById('clear-btn').classList.toggle('visible',  hasText);
-}
-async function pasteFromClipboard() {
-    try {
-        const text = await navigator.clipboard.readText();
-        const input = document.getElementById('ig-url');
-        input.value = text.trim();
-        _syncInputBtns();
-        input.focus();
-    } catch(e) {
-        // Clipboard API blocked (e.g. non-HTTPS) — just focus the field
-        document.getElementById('ig-url').focus();
-    }
-}
-function clearInput() {
-    const input = document.getElementById('ig-url');
-    input.value = '';
-    _syncInputBtns();
-    input.focus();
-    hideMsg();
-    hide('single-result');
-    hide('profile-result');
-    document.getElementById('ready-card').style.display = 'none';
-}
-document.getElementById('ig-url').addEventListener('input', _syncInputBtns);
+        # ── Photo ──
+        for pat in [
+            r'"display_url"\s*:\s*"(https://[^"]+)"',
+            r'"thumbnail_src"\s*:\s*"(https://[^"]+)"',
+            r'<meta property="og:image" content="([^"]+)"',
+            r'<meta content="([^"]+)" property="og:image"',
+            r'<img[^>]+src="(https://[^"]*(?:scontent|cdninstagram)[^"]+\.(?:jpg|png))[^"]*"',
+        ]:
+            m = re.search(pat, html)
+            if m:
+                img_url   = _unescape_url(m.group(1))
+                shortcode = _extract_shortcode(url) or f"img_{int(time.time())}"
+                logger.info("📸 Image URL found via Direct HTTP")
+                return _download_cdn_image(img_url, shortcode)
 
-document.getElementById('ig-url').addEventListener('keypress',e=>{if(e.key==='Enter')handleSearch();});
-</script>
-</body>
-</html>
+        logger.warning("⚠️ Direct HTTP: no video or image URL patterns matched the HTML")
+        return None
+
+    except Exception as e:
+        logger.warning(f"⚠️ Direct HTTP failed: {str(e)}")
+        return None
+
+
+def _download_raw_url(media_url, ext):
+    """Generic URL → file download with Instagram Referer headers."""
+    try:
+        cookies = load_cookies()
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Referer':    'https://www.instagram.com/',
+            'Accept':     '*/*',
+        }
+        if cookies:
+            headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
+
+        resp = requests.get(media_url, headers=headers, timeout=60, stream=True)
+        if resp.status_code == 200:
+            filename = os.path.join(DOWNLOAD_FOLDER, f"media_{int(time.time())}.{ext}")
+            with open(filename, 'wb') as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                file_size = os.path.getsize(filename)
+                logger.info(f"✅ Raw download: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
+        return None
+    except Exception as e:
+        logger.warning(f"⚠️ Raw URL download failed: {e}")
+        return None
+
+
+# keep old name as alias so nothing else breaks
+def download_media_url(media_url, ext):
+    return _download_raw_url(media_url, ext)
+
+
+@app.route('/api/thumbnail', methods=['GET'])
+def proxy_thumbnail():
+    """
+    Proxy Instagram CDN thumbnail images to the browser.
+    Instagram CDN blocks direct browser requests (wrong Referer / CORS).
+    Usage: /api/thumbnail?url=<encoded_cdn_url>
+    """
+    from flask import Response
+    from urllib.parse import unquote
+    img_url = request.args.get('url', '').strip()
+    if not img_url:
+        return jsonify({'error': 'url param required'}), 400
+    # Only allow Instagram / Facebook / YouTube CDN domains
+    allowed = ('instagram.com', 'cdninstagram.com', 'fbcdn.net', 'fbsbx.com',
+               'ytimg.com', 'ggpht.com', 'googleusercontent.com',
+               'twimg.com', 'pbs.twimg.com',
+               'pinimg.com', 'i.pinimg.com')      # Pinterest image CDN
+    if not any(d in img_url for d in allowed):
+        return jsonify({'error': 'Disallowed domain'}), 403
+    try:
+        is_twitter   = 'twimg.com' in img_url
+        is_pinterest = 'pinimg.com' in img_url
+        headers = {
+            'User-Agent': get_random_user_agent(),
+            'Referer':    'https://www.pinterest.com/' if is_pinterest
+                          else ('https://twitter.com/' if is_twitter
+                          else 'https://www.instagram.com/'),
+            'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
+        }
+        if not is_twitter and not is_pinterest:
+            cookies = load_cookies()
+            if cookies:
+                headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
+        resp = requests.get(img_url, headers=headers, timeout=15, stream=True)
+        if resp.status_code != 200:
+            return jsonify({'error': f'CDN returned {resp.status_code}'}), 502
+        content_type = resp.headers.get('Content-Type', 'image/jpeg')
+        return Response(
+            resp.iter_content(chunk_size=8192),
+            status=200,
+            content_type=content_type,
+            headers={
+                'Cache-Control': 'public, max-age=3600',
+            }
+        )
+    except Exception as e:
+        logger.warning(f"⚠️ Thumbnail proxy failed: {e}")
+        return jsonify({'error': str(e)}), 502
+
+
+@app.route('/api/file/<filename>', methods=['GET'])
+def get_file(filename):
+    try:
+        file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+
+        # Path traversal guard
+        if not os.path.abspath(file_path).startswith(os.path.abspath(DOWNLOAD_FOLDER)):
+            return jsonify({'error': 'Invalid file path'}), 403
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+
+        # Delete the temp file from /tmp as soon as the response is sent
+        @after_this_request
+        def _cleanup(response):
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"🗑️ Cleaned up temp file: {filename}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not delete {filename}: {e}")
+            return response
+
+        return send_file(file_path, as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/status', methods=['GET'])
+def status():
+    return jsonify({
+        'status': 'online',
+        'yt_dlp': YTDLP_AVAILABLE,
+        'instagrapi': INSTAGRAPI_AVAILABLE,
+        'selenium': SELENIUM_AVAILABLE,
+        'methods': [m for m in ['Instagrapi', 'yt-dlp', 'Direct HTTP'] if (m == 'Instagrapi' and INSTAGRAPI_AVAILABLE) or (m == 'yt-dlp' and YTDLP_AVAILABLE) or m == 'Direct HTTP']
+    })
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8000))
+    debug = not IS_PRODUCTION
+    app.run(debug=debug, host='0.0.0.0', port=port)
+

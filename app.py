@@ -251,20 +251,8 @@ def sitemap():
 def detect():
     """Tell frontend what kind of URL was pasted."""
     url = (request.json or {}).get('url', '').strip()
-    if not url or (
-        'instagram.com' not in url
-        and 'youtube.com' not in url
-        and 'youtu.be' not in url
-        and 'twitter.com' not in url
-        and 'x.com' not in url
-        and 'pinterest.com' not in url
-        and 'pinterest.co' not in url
-        and 'pin.it' not in url
-        and 'facebook.com' not in url
-        and 'fb.watch' not in url
-        and 'fb.com' not in url
-    ):
-        return jsonify({'error': 'Not a recognised Instagram, YouTube, Twitter/X, Pinterest, or Facebook URL'}), 400
+    if not url or not (url.startswith('http://') or url.startswith('https://')):
+        return jsonify({'error': 'Please enter a valid URL starting with http:// or https://'}), 400
     return jsonify({'url_type': detect_url_type(url)})
 
 
@@ -583,21 +571,8 @@ def get_preview():
 
         logger.info(f"📸 Fetching preview for: {instagram_url}")
 
-        if not instagram_url or (
-            'instagram.com' not in instagram_url
-            and 'youtube.com' not in instagram_url
-            and 'youtu.be' not in instagram_url
-            and 'twitter.com' not in instagram_url
-            and 'x.com' not in instagram_url
-            and 'pinterest.com' not in instagram_url
-            and 'pinterest.co' not in instagram_url
-            and 'pin.it' not in instagram_url
-            and 'facebook.com' not in instagram_url
-            and 'fb.watch' not in instagram_url
-            and 'fb.com' not in instagram_url
-            and 'tiktok.com' not in instagram_url
-        ):
-            return jsonify({'error': 'Invalid URL'}), 400
+        if not instagram_url or not (instagram_url.startswith('http://') or instagram_url.startswith('https://')):
+            return jsonify({'error': 'Please enter a valid URL'}), 400
         
         # Try to extract preview info
         preview_info = extract_preview_info(instagram_url)
@@ -787,10 +762,16 @@ def download():
             return jsonify({'error': 'YouTube download failed. Try a different quality or check the URL.'}), 400
 
         # ── Instagram ──
-        if 'instagram.com' not in url:
-            return jsonify({'error': 'Unsupported URL. Paste an Instagram or YouTube link.'}), 400
+        if 'instagram.com' in url:
+            return try_download_methods(url, 'best', content_type)
 
-        return try_download_methods(url, 'best', content_type)
+        # ── Generic fallback — try yt-dlp for any other site ──
+        if not YTDLP_AVAILABLE:
+            return jsonify({'error': 'yt-dlp not available on this server'}), 500
+        result = download_generic(url, quality)
+        if result and result.status_code == 200:
+            return result
+        return jsonify({'error': '⚠️ Could not download from this URL. The site may not be supported or the video may be private.'}), 400
 
     except Exception as e:
         logger.error(f"❌ Download error: {e}", exc_info=True)
@@ -904,6 +885,66 @@ def download_tiktok(url, quality='best'):
         if 'private' in err or 'login' in err:
             return jsonify({'error': '🔒 This TikTok video is private or requires login.'}), 400
         logger.warning(f"⚠️ TikTok download failed: {e}")
+        return None
+
+
+def download_generic(url, quality='best'):
+    """
+    Generic yt-dlp download for any URL not matched by a specific platform handler.
+    yt-dlp supports 1000+ sites — Vimeo, Twitch, Reddit, Dailymotion, etc.
+    """
+    try:
+        # Use best MP4 format; fall back to best available
+        fmt = {
+            'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+            '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
+            '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+            '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+            '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+            'audio': 'bestaudio',
+        }.get(quality, 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best')
+
+        is_audio = (quality == 'audio')
+        logger.info(f"🌐 Generic download: {url} | quality={quality}")
+
+        ydl_opts = {
+            'format':         fmt,
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
+        }
+        if not is_audio:
+            ydl_opts['merge_output_format'] = 'mp4'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Generic: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'unsupported url' in err:
+            return jsonify({'error': f'⛔ This site is not supported by our downloader.'}), 400
+        if 'private' in err or 'login' in err or 'age' in err:
+            return jsonify({'error': '🔒 This video is private, age-restricted, or requires login.'}), 400
+        logger.warning(f"⚠️ Generic download failed: {e}")
         return None
 
 

@@ -1063,34 +1063,91 @@ def download_twitter(url, quality='best'):
 def download_pinterest(url):
     """Download a Pinterest video or image pin using yt-dlp.
 
-    Uses a progressive format fallback chain so the download works on
-    environments without ffmpeg (e.g. Railway), where yt-dlp cannot merge
-    separate video+audio streams.
+    Strategy: inspect real available format IDs first, then download the
+    best one that doesn't require ffmpeg merging (when ffmpeg is absent).
+    This avoids all 'Requested format is not available' errors on Railway.
     """
+    logger.info(f"📌 Pinterest download: {url} | ffmpeg={FFMPEG_AVAILABLE}")
 
-    def _try_download(fmt, merge=False):
-        """Attempt one yt-dlp download with the given format string.
-        Returns the jsonify response on success, None on failure.
-        Raises on non-format errors so the outer loop can surface them.
-        """
-        ydl_opts = {
-            'format':          fmt,
-            'outtmpl':         os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
-            'quiet':           True,
-            'no_warnings':     True,
-            'socket_timeout':  60,
-            'retries':         3,
-            # Never abort just because a format isn't available – let our loop handle it
-            'ignoreerrors':    False,
-        }
-        if merge and FFMPEG_AVAILABLE:
-            ydl_opts['merge_output_format'] = 'mp4'
+    base_opts = {
+        'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+        'quiet':          True,
+        'no_warnings':    True,
+        'socket_timeout': 60,
+        'retries':        3,
+    }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if not info:
+    try:
+        # ── Step 1: Extract metadata WITHOUT downloading ──────────────
+        with yt_dlp.YoutubeDL({**base_opts, 'skip_download': True}) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        if not info:
+            logger.warning("⚠️ Pinterest: no info returned")
+            return None
+
+        formats = info.get('formats') or []
+        logger.info(f"   Available format count: {len(formats)}")
+        for f in formats:
+            logger.info(f"   fmt id={f.get('format_id')} ext={f.get('ext')} "
+                        f"vcodec={f.get('vcodec')} acodec={f.get('acodec')} "
+                        f"height={f.get('height')} tbr={f.get('tbr')}")
+
+        # ── Step 2: Pick the best format we can actually download ─────
+        chosen_fmt_id = None
+
+        if FFMPEG_AVAILABLE:
+            # With ffmpeg we can merge, just let yt-dlp pick best
+            chosen_fmt_id = 'bestvideo+bestaudio/best'
+        else:
+            # Without ffmpeg we MUST pick a single-stream format
+            # Priority 1: combined stream (has both video AND audio)
+            combined = [
+                f for f in formats
+                if f.get('vcodec', 'none') not in ('none', None, '')
+                and f.get('acodec', 'none') not in ('none', None, '')
+            ]
+            if combined:
+                combined.sort(
+                    key=lambda x: (x.get('height') or 0, x.get('tbr') or 0),
+                    reverse=True
+                )
+                chosen_fmt_id = combined[0]['format_id']
+                logger.info(f"   ✅ Chosen combined format: {chosen_fmt_id} "
+                            f"({combined[0].get('ext')}, {combined[0].get('height')}p)")
+            else:
+                # Priority 2: best video-only (no audio, but at least gives video)
+                video_only = [
+                    f for f in formats
+                    if f.get('vcodec', 'none') not in ('none', None, '')
+                ]
+                if video_only:
+                    video_only.sort(
+                        key=lambda x: (x.get('height') or 0, x.get('tbr') or 0),
+                        reverse=True
+                    )
+                    chosen_fmt_id = video_only[0]['format_id']
+                    logger.info(f"   ⚠️ No combined stream — using video-only: {chosen_fmt_id}")
+                elif formats:
+                    # Last resort: whatever format exists
+                    chosen_fmt_id = formats[-1]['format_id']
+                    logger.info(f"   ⚠️ Using last-resort format: {chosen_fmt_id}")
+
+        if not chosen_fmt_id:
+            logger.warning("⚠️ Pinterest: no usable format found in format list")
+            return jsonify({'error': '🖼️ This pin has no downloadable video. It may be image-only or private.'}), 400
+
+        # ── Step 3: Download with the chosen format ───────────────────
+        dl_opts = {**base_opts, 'format': chosen_fmt_id}
+        if FFMPEG_AVAILABLE:
+            dl_opts['merge_output_format'] = 'mp4'
+
+        logger.info(f"   ↳ Downloading with format: {chosen_fmt_id}")
+        with yt_dlp.YoutubeDL(dl_opts) as ydl:
+            dl_info = ydl.extract_info(url, download=True)
+            if not dl_info:
                 return None
-            filename = ydl.prepare_filename(info)
+            filename = ydl.prepare_filename(dl_info)
             if not os.path.exists(filename):
                 base = os.path.splitext(filename)[0]
                 for ext in ('mp4', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'webp', 'mp3', 'm4a'):
@@ -1108,50 +1165,12 @@ def download_pinterest(url):
                 })
         return None
 
-    # ── Format fallback chain ──────────────────────────────────────────
-    # Each entry: (format_string, use_merge)
-    # Ordered from best quality to broadest fallback.
-    # Formats without ext restrictions always have something available.
-    candidates = []
-    if FFMPEG_AVAILABLE:
-        candidates = [
-            ('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio', True),
-            ('best[ext=mp4]/best',                                         False),
-            ('best',                                                        False),
-        ]
-    else:
-        candidates = [
-            ('best[ext=mp4]/best',  False),   # single-stream mp4 when available
-            ('best',                False),   # any single-stream format – always works
-        ]
-
-    logger.info(f"📌 Pinterest download: {url} | ffmpeg={FFMPEG_AVAILABLE}")
-
-    last_error = None
-    for fmt, merge in candidates:
-        try:
-            logger.info(f"   ↳ trying fmt: {fmt}")
-            result = _try_download(fmt, merge)
-            if result is not None:
-                return result
-        except Exception as e:
-            err_lower = str(e).lower()
-            if 'requested format is not available' in err_lower or \
-               'no video formats found' in err_lower or \
-               'format is not available' in err_lower:
-                logger.warning(f"   ✗ format unavailable, trying next: {e}")
-                last_error = e
-                continue   # try next candidate
-            # Non-format error – surface it immediately
-            logger.warning(f"⚠️ Pinterest download failed: {e}")
-            err = err_lower
-            if 'no video' in err or 'no media' in err:
-                return jsonify({'error': '🖼️ This pin has no downloadable video. Image-only pins are not supported yet.'}), 400
-            return None
-
-    # All candidates exhausted
-    logger.warning(f"⚠️ Pinterest download failed after all fallbacks: {last_error}")
-    return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'no video' in err or 'no media' in err or 'image-only' in err:
+            return jsonify({'error': '🖼️ This pin has no downloadable video. Image-only pins are not supported.'}), 400
+        logger.warning(f"⚠️ Pinterest download failed: {e}")
+        return None
 
 
 FACEBOOK_FORMATS = {

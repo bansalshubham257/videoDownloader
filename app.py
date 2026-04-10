@@ -168,7 +168,9 @@ def detect_url_type(url):
 
     # ── Twitter / X ───────────────────────────────────────────────────────
     if 'twitter.com' in url or 'x.com' in url:
-        return 'twitter_video'
+        if '/status/' in url:
+            return 'twitter_video'   # individual tweet with video
+        return 'twitter_profile'     # profile page — not downloadable
 
     # ── YouTube ──────────────────────────────────────────────────────────
     if 'youtube.com' in url or 'youtu.be' in url:
@@ -622,21 +624,42 @@ def extract_preview_info(url):
             if thumbnail or description:
                 preview_data['thumbnail']   = thumbnail
                 preview_data['title']       = title
-                preview_data['description'] = description   # keep separate; frontend will show both
+                preview_data['description'] = description
                 preview_data['is_video']    = is_video
                 preview_data['type']        = 'video' if is_video else 'photo'
 
-                # Duration from JSON blob
-                dur_m = re.search(r'"video_duration"\s*:\s*(\d+(?:\.\d+)?)', html)
-                if dur_m:
-                    dur = float(dur_m.group(1))
-                    preview_data['duration'] = f"{int(dur)//60}:{int(dur)%60:02d}"
-
-                logger.info(f"✅ HTML scrape preview: thumbnail={'yes' if thumbnail else 'no'}, desc_len={len(description)}")
-                return preview_data
-
     except Exception as e:
         logger.warning(f"⚠️ HTML scrape preview failed: {e}")
+
+    # ── Method 3: Twitter oEmbed (public, no auth — works for text-only tweets) ──
+    is_twitter_url = 'twitter.com' in url or 'x.com' in url
+    if is_twitter_url:
+        try:
+            logger.info("🔍 Trying Twitter oEmbed API...")
+            oembed_url = f'https://publish.twitter.com/oembed?url={url}&omit_script=true'
+            r = requests.get(oembed_url, timeout=10)
+            if r.status_code == 200:
+                oe = r.json()
+                # Extract plain text from the HTML snippet
+                raw_html = oe.get('html', '')
+                tweet_text = re.sub(r'<[^>]+>', ' ', raw_html)   # strip tags
+                tweet_text = re.sub(r'\s+', ' ', tweet_text).strip()
+                author = oe.get('author_name', '')
+
+                if not preview_data.get('title'):
+                    preview_data['title'] = author
+                if not preview_data.get('description'):
+                    preview_data['description'] = tweet_text
+                if 'is_video' not in preview_data:
+                    preview_data['is_video'] = False
+                    preview_data['no_video'] = True   # signal: text-only tweet
+                preview_data['type'] = preview_data.get('type', 'tweet')
+                logger.info(f"✅ oEmbed: author={author}, text_len={len(tweet_text)}")
+        except Exception as e:
+            logger.warning(f"⚠️ Twitter oEmbed failed: {e}")
+
+    if preview_data:
+        return preview_data
 
     logger.warning("⚠️ All preview methods failed")
     return None
@@ -782,6 +805,11 @@ def download_twitter(url, quality='best'):
                     })
         return None
     except Exception as e:
+        err = str(e).lower()
+        if 'no video' in err or 'no media' in err or 'does not have' in err:
+            return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
+        if 'guest token' in err or 'bad guest' in err:
+            return jsonify({'error': '⚠️ Twitter API temporarily unavailable. Please try again in a moment.'}), 400
         logger.warning(f"⚠️ Twitter download failed: {e}")
         return None
 

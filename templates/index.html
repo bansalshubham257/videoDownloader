@@ -20,6 +20,7 @@
         .pill-ig{background:#fce4ec;color:#c2185b;}
         .pill-yt{background:#ffebee;color:#c62828;}
         .pill-tw{background:#e8f5fd;color:#1a8cd8;}
+        .pill-pi{background:#fce8e8;color:#e60023;}
         .search-row{display:flex;gap:10px;}
         .input-wrap{flex:1;position:relative;display:flex;align-items:center;}
         .input-wrap input{width:100%;padding:14px 44px 14px 18px;font-size:15px;border:1.5px solid #ddd;border-radius:10px;outline:none;background:#fff;transition:border-color .2s;}
@@ -102,8 +103,17 @@
         .dl-btn-wrap button.yt-btn:hover{background:#c62828;}
         .dl-btn-wrap button.tw-btn{background:#1a8cd8;}
         .dl-btn-wrap button.tw-btn:hover{background:#1570b0;}
+        .dl-btn-wrap button.pi-btn{background:#e60023;}
+        .dl-btn-wrap button.pi-btn:hover{background:#b8001c;}
         .yt-q-btn.tw-active{border-color:#1a8cd8;background:#e8f5fd;color:#1570b0;}
         .caption{max-width:640px;margin:0 auto 28px;font-size:14px;color:#333;line-height:1.7;}
+
+        /* ── Copy button ── */
+        .copy-btn{display:inline-flex;align-items:center;justify-content:center;background:none;border:1.5px solid #e0e0e0;cursor:pointer;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;color:#aaa;transition:color .15s,background .15s,border-color .15s;white-space:nowrap;flex-shrink:0;}
+        .copy-btn:hover{color:#3d82f7;background:#eef4ff;border-color:#3d82f7;}
+        .copy-btn.copied{color:#27ae60;background:#e8f5e9;border-color:#27ae60;}
+        .copy-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;}
+        .copy-row .copy-btn{margin-top:2px;}
 
         /* Ready card */
         .ready-card{max-width:400px;margin:0 auto 30px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.10);text-align:center;}
@@ -308,10 +318,11 @@
         <span class="brand-pill pill-ig">📸 Instagram</span>
         <span class="brand-pill pill-yt">▶️ YouTube</span>
         <span class="brand-pill pill-tw">𝕏 Twitter/X</span>
+        <span class="brand-pill pill-pi">📌 Pinterest</span>
     </div>
     <div class="search-row">
         <div class="input-wrap">
-            <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, or Twitter/X link…" autocomplete="off">
+            <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, Twitter/X, or Pinterest link…" autocomplete="off">
             <!-- Paste button: shown when input is empty -->
             <button class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
             <!-- Clear button: shown when input has text -->
@@ -376,7 +387,10 @@
 
 <!-- ── Single result (Instagram post OR YouTube video) ── -->
 <div id="single-result">
-    <h2 id="s-title">Search result</h2>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <h2 id="s-title" style="margin-bottom:0;">Search result</h2>
+        <button class="copy-btn" id="s-title-copy" onclick="copyText(document.getElementById('s-title').textContent,this)" title="Copy title">⎘ Copy</button>
+    </div>
     <p class="s-meta" id="s-meta"></p>
 
     <!-- Instagram options -->
@@ -421,14 +435,23 @@
         </div>
     </div>
 
-    <div class="caption" id="s-caption"></div>
+    <div class="copy-row caption" style="margin:0 auto 28px;max-width:640px;">
+        <div id="s-caption" style="flex:1;font-size:14px;color:#333;line-height:1.7;"></div>
+        <button class="copy-btn" id="s-caption-copy" onclick="copyText(document.getElementById('s-caption').textContent,this)" title="Copy description">⎘ Copy</button>
+    </div>
 
     <div class="ready-card" id="ready-card" style="display:none;">
         <div class="rc-thumb"><img id="rc-thumb" src="" alt="" style="display:none;"></div>
         <div class="rc-body">
             <h3>✅ Downloaded!</h3>
-            <div class="rc-title" id="rc-title"></div>
-            <div class="rc-caption" id="rc-caption"></div>
+            <div class="copy-row" id="rc-title-row" style="display:none;">
+                <div class="rc-title" id="rc-title"></div>
+                <button class="copy-btn" onclick="copyText(document.getElementById('rc-title').textContent,this)" title="Copy title">⎘ Copy</button>
+            </div>
+            <div class="copy-row" id="rc-caption-row" style="display:none;">
+                <div class="rc-caption" id="rc-caption"></div>
+                <button class="copy-btn" onclick="copyText(document.getElementById('rc-caption').textContent,this)" title="Copy description">⎘ Copy</button>
+            </div>
             <hr class="rc-divider" id="rc-divider" style="display:none;">
             <div class="rc-meta" id="rc-filename"></div>
             <div class="rc-meta" id="rc-filesize"></div>
@@ -477,7 +500,7 @@
 
 <script>
 let currentUrl      = '';
-let currentPlatform = 'instagram';   // 'instagram' | 'youtube' | 'twitter'
+let currentPlatform = 'instagram';   // 'instagram' | 'youtube' | 'twitter' | 'pinterest'
 let ytQuality       = 'best';        // active quality for single YT video
 let twQuality       = 'best';        // active quality for Twitter/X video
 let previewData     = null;
@@ -537,8 +560,9 @@ async function handleSearch() {
     const url = document.getElementById('ig-url').value.trim();
     if (!url) return showMsg('Please enter a URL', 'error');
     if (!url.includes('instagram.com') && !url.includes('youtube.com') && !url.includes('youtu.be')
-        && !url.includes('twitter.com') && !url.includes('x.com'))
-        return showMsg('Please paste an Instagram, YouTube, or Twitter/X link', 'error');
+        && !url.includes('twitter.com') && !url.includes('x.com')
+        && !url.includes('pinterest.com') && !url.includes('pinterest.co') && !url.includes('pin.it'))
+        return showMsg('Please paste an Instagram, YouTube, Twitter/X, or Pinterest link', 'error');
 
     currentUrl = url;
     setBusy('search', true);
@@ -551,7 +575,12 @@ async function handleSearch() {
         const dr   = await post('/api/detect', { url });
         const type = dr.url_type;
 
-        if (type === 'twitter_profile') {
+        if (type === 'pinterest_post') {
+            currentPlatform = 'pinterest';
+            await loadSinglePost(url, 'pinterest');
+        } else if (type === 'pinterest_profile') {
+            showMsg('⚠️ Pinterest profile/board pages are not supported. Please paste a direct pin link — it should contain "/pin/" in the URL.', 'error');
+        } else if (type === 'twitter_profile') {
             showMsg('⚠️ Twitter/X profile pages are not supported. Please paste a direct tweet link — it should contain "/status/" in the URL.', 'error');
         } else if (type === 'twitter_video') {
             currentPlatform = 'twitter';
@@ -690,10 +719,10 @@ function postCardHTML(p) {
 
     // Show title bold + description below; fall back gracefully
     const titleHtml = title
-        ? `<div class="pc-title">${esc(title)}</div>`
+        ? `<div class="copy-row"><div class="pc-title">${esc(title)}</div><button class="copy-btn" data-copy="${esc(title)}" onclick="copyText(this.dataset.copy,this)" title="Copy title">⎘ Copy</button></div>`
         : '';
     const descHtml = desc && desc !== title
-        ? `<div class="pc-desc">${esc(desc)}</div>`
+        ? `<div class="copy-row"><div class="pc-desc">${esc(desc)}</div><button class="copy-btn" data-copy="${esc(desc)}" onclick="copyText(this.dataset.copy,this)" title="Copy description">⎘ Copy</button></div>`
         : (!title ? `<div class="pc-desc" style="color:#aaa;font-style:italic;">No description</div>` : '');
 
     return `
@@ -814,7 +843,7 @@ async function loadSinglePost(url, platform) {
     igOpts.style.display = 'none';
     ytOpts.classList.remove('show');
     twOpts.classList.remove('show');
-    dlBtn.classList.remove('yt-btn', 'tw-btn');
+    dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn');
 
     if (platform === 'youtube') {
         ytOpts.classList.add('show');
@@ -822,6 +851,8 @@ async function loadSinglePost(url, platform) {
     } else if (platform === 'twitter') {
         twOpts.classList.add('show');
         dlBtn.classList.add('tw-btn');
+    } else if (platform === 'pinterest') {
+        dlBtn.classList.add('pi-btn');   // Pinterest red, no quality selector
     } else {
         igOpts.style.display = 'flex';
     }
@@ -863,12 +894,14 @@ function showSinglePreview(p) {
     document.getElementById('s-vc').style.display    = p.is_video ? 'flex' : 'none';
     document.getElementById('s-title').textContent   = p.title || 'Result';
     document.getElementById('s-meta').textContent    = p.uploader ? '📺 ' + p.uploader : '';
+    document.getElementById('s-title-copy').style.display = p.title ? 'inline-flex' : 'none';
 
     // Show description separately from title
     const captionEl = document.getElementById('s-caption');
     const desc = p.description || '';
     const title = p.title || '';
     captionEl.textContent = (desc && desc !== title) ? desc : '';
+    document.getElementById('s-caption-copy').style.display = (desc && desc !== title) ? 'inline-flex' : 'none';
 
     // Text-only tweet — disable download button and show notice
     const dlBtn  = document.getElementById('s-dl-btn');
@@ -897,6 +930,8 @@ async function singleDownload() {
         ? { url: currentUrl, quality: ytQuality }
         : currentPlatform === 'twitter'
         ? { url: currentUrl, quality: twQuality }
+        : currentPlatform === 'pinterest'
+        ? { url: currentUrl }
         : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
 
     try {
@@ -929,13 +964,13 @@ function showReadyCard(data) {
     const titleEl = document.getElementById('rc-title');
     const title = previewData?.title || '';
     titleEl.textContent = title;
-    titleEl.style.display = title ? 'block' : 'none';
+    document.getElementById('rc-title-row').style.display = title ? 'flex' : 'none';
 
     // Description (body text) — only show if different from title
     const descEl = document.getElementById('rc-caption');
     const desc = previewData?.description || '';
     descEl.textContent = desc;
-    descEl.style.display = desc ? 'block' : 'none';
+    document.getElementById('rc-caption-row').style.display = desc ? 'flex' : 'none';
 
     // Divider — show only if we have at least one of title/description
     document.getElementById('rc-divider').style.display = (title || desc) ? 'block' : 'none';
@@ -947,6 +982,32 @@ function showReadyCard(data) {
     link.download = data.filename;
     rc.style.display = 'block';
     rc.scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ─── COPY TEXT ──────────────────────────────────────────────────────── */
+function copyText(text, btn) {
+    if (!text || !text.trim()) return;
+    const doFlash = () => {
+        if (!btn) return;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text.trim()).then(doFlash).catch(() => _copyFallback(text, doFlash));
+    } else {
+        _copyFallback(text, doFlash);
+    }
+}
+function _copyFallback(text, cb) {
+    const ta = document.createElement('textarea');
+    ta.value = text.trim();
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); cb(); } catch(e) {}
+    document.body.removeChild(ta);
 }
 
 /* ─── PLAY & LIGHTBOX ────────────────────────────────────────────────── */

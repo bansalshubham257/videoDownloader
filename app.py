@@ -229,6 +229,12 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/sw.js')
+def service_worker():
+    sw_path = os.path.join(app.root_path, 'sw.js')
+    return send_file(sw_path, mimetype='application/javascript')
+
+
 @app.route('/about')
 def about():
     return render_template('about.html')

@@ -86,8 +86,54 @@ USER_AGENTS = [
     'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
 ]
 
+YTDLP_COOKIE_FILE = (os.environ.get('YTDLP_COOKIE_FILE') or '').strip()
+if YTDLP_COOKIE_FILE:
+    if os.path.exists(YTDLP_COOKIE_FILE):
+        logger.info(f"✅ YTDLP_COOKIE_FILE configured: {YTDLP_COOKIE_FILE}")
+    else:
+        logger.warning(f"⚠️ YTDLP_COOKIE_FILE does not exist: {YTDLP_COOKIE_FILE}")
+
 def get_random_user_agent():
     return random.choice(USER_AGENTS)
+
+
+def is_youtube_url(url):
+    u = (url or '').lower()
+    return 'youtube.com' in u or 'youtu.be' in u or 'm.youtube.com' in u
+
+
+def is_youtube_bot_challenge_error(err_text):
+    err = (err_text or '').lower()
+    return (
+        "sign in to confirm you're not a bot" in err
+        or "sign in to confirm you\u2019re not a bot" in err
+        or 'confirm you\u2019re not a bot' in err
+        or "confirm you're not a bot" in err
+        or 'use --cookies-from-browser or --cookies' in err
+    )
+
+
+def build_youtube_ydl_overrides(timeout=60):
+    """Return yt-dlp options that are safer for YouTube in cloud environments."""
+    opts = {
+        'socket_timeout': timeout,
+        'http_headers': {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/123.0.0.0 Safari/537.36'
+            )
+        },
+        # Try multiple YouTube clients; this can reduce bot-check frequency.
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web']
+            }
+        },
+    }
+    if YTDLP_COOKIE_FILE and os.path.exists(YTDLP_COOKIE_FILE):
+        opts['cookiefile'] = YTDLP_COOKIE_FILE
+    return opts
 
 # ── Cookie helpers ──────────────────────────────────────────────────────────
 
@@ -636,7 +682,10 @@ def get_preview():
         
         # Try to extract preview info
         preview_info = extract_preview_info(instagram_url)
-        
+
+        if preview_info and preview_info.get('_error'):
+            return jsonify({'error': preview_info['_error']}), 400
+
         if preview_info:
             return jsonify({
                 'success': True,
@@ -660,6 +709,7 @@ def extract_preview_info(url):
         try:
             logger.info("🔍 Extracting preview via yt-dlp...")
             is_twitter = 'twitter.com' in url
+            is_youtube = is_youtube_url(url)
             ydl_opts = {
                 'quiet':          True,
                 'no_warnings':    True,
@@ -675,6 +725,8 @@ def extract_preview_info(url):
                     'AppleWebKit/537.36 (KHTML, like Gecko) '
                     'Chrome/120.0.0.0 Safari/537.36'
                 )
+            elif is_youtube:
+                ydl_opts.update(build_youtube_ydl_overrides(timeout=20))
             elif os.path.exists(NETSCAPE_COOKIES_FILE):
                 ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -694,6 +746,13 @@ def extract_preview_info(url):
                     logger.info(f"✅ yt-dlp preview: thumbnail={'yes' if preview_data.get('thumbnail') else 'no'}, desc_len={len(preview_data.get('description',''))}")
                     return preview_data
         except Exception as e:
+            if is_youtube_url(url) and is_youtube_bot_challenge_error(str(e)):
+                return {
+                    '_error': (
+                        'YouTube is asking for bot verification on this server. '
+                        'Set env var YTDLP_COOKIE_FILE with exported YouTube cookies and redeploy, or try another video.'
+                    )
+                }
             logger.warning(f"⚠️ yt-dlp preview failed: {e}")
 
     # ── Method 2: HTML scraping (og: meta tags) ──
@@ -781,7 +840,7 @@ def download():
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
             result = download_tiktok(url, quality)
-            if result and result.status_code == 200:
+            if result:
                 return result
             return jsonify({'error': 'TikTok download failed. The video may be private or region-restricted.'}), 400
 
@@ -790,7 +849,7 @@ def download():
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
             result = download_facebook(url, quality)
-            if result and result.status_code == 200:
+            if result:
                 return result
             return jsonify({'error': 'Facebook download failed. The video may be private or login-protected.'}), 400
 
@@ -799,7 +858,7 @@ def download():
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
             result = download_pinterest(url)
-            if result and result.status_code == 200:
+            if result:
                 return result
             return jsonify({'error': 'Pinterest download failed. The pin may contain no video/image, or may be private.'}), 400
 
@@ -808,7 +867,7 @@ def download():
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
             result = download_twitter(url, quality)
-            if result and result.status_code == 200:
+            if result:
                 return result
             return jsonify({'error': 'Twitter/X download failed. The tweet may have no video, or it may be age-restricted.'}), 400
 
@@ -817,7 +876,7 @@ def download():
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
             result = download_youtube(url, quality, content_type)
-            if result and result.status_code == 200:
+            if result:
                 return result
             return jsonify({'error': 'YouTube download failed. Try a different quality or check the URL.'}), 400
 
@@ -831,7 +890,7 @@ def download():
                 return jsonify({'error': 'yt-dlp not available on this server'}), 500
             logger.info(f"🔄 Trying generic yt-dlp download for unknown site: {url}")
             result = download_generic(url, quality)
-            if result and result.status_code == 200:
+            if result:
                 logger.info("✅ Generic download succeeded")
                 return result
             logger.warning("⚠️ Generic download failed")
@@ -916,7 +975,7 @@ def _is_format_unavailable_error(err_text):
     )
 
 
-def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=60, merge=False, postprocessors=None, scan_exts=None):
+def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=60, merge=False, postprocessors=None, scan_exts=None, ydl_overrides=None):
     """Try yt-dlp with requested format, then progressively broader fallbacks.
 
     If one format is unavailable, this retries with the next candidate and
@@ -937,6 +996,8 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
                 'socket_timeout': timeout,
                 'retries':        3,
             }
+            if ydl_overrides:
+                ydl_opts.update(ydl_overrides)
             if merge and FFMPEG_AVAILABLE:
                 ydl_opts['merge_output_format'] = 'mp4'
             if postprocessors and FFMPEG_AVAILABLE:
@@ -1290,7 +1351,8 @@ def download_youtube(url, quality='best', content_type='both'):
             timeout=120,
             merge=(not is_audio),
             postprocessors=postprocessors,
-            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg')
+            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg'),
+            ydl_overrides=build_youtube_ydl_overrides(timeout=120)
         )
         if filename:
             logger.info(f"✅ YouTube: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
@@ -1301,6 +1363,13 @@ def download_youtube(url, quality='best', content_type='both'):
             })
         return None
     except Exception as e:
+        if is_youtube_bot_challenge_error(str(e)):
+            return jsonify({
+                'error': (
+                    'YouTube blocked this request with bot verification. '
+                    'Configure YTDLP_COOKIE_FILE (exported YouTube cookies) on the server and retry.'
+                )
+            }), 400
         logger.warning(f"⚠️ YouTube download failed: {e}")
         return None
 

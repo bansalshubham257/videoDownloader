@@ -21,11 +21,15 @@
         .pill-yt{background:#ffebee;color:#c62828;}
         .pill-tw{background:#e8f5fd;color:#1a8cd8;}
         .search-row{display:flex;gap:10px;}
-        .search-row input{flex:1;padding:14px 18px;font-size:15px;border:1.5px solid #ddd;border-radius:10px;outline:none;background:#fff;transition:border-color .2s;}
-        .search-row input:focus{border-color:#3d82f7;}
-        .search-row button{padding:14px 26px;font-size:15px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;}
-        .search-row button:hover{background:#2e73e8;}
-        .search-row button:disabled{background:#9ab8f0;cursor:not-allowed;}
+        .input-wrap{flex:1;position:relative;display:flex;align-items:center;}
+        .input-wrap input{width:100%;padding:14px 44px 14px 18px;font-size:15px;border:1.5px solid #ddd;border-radius:10px;outline:none;background:#fff;transition:border-color .2s;}
+        .input-wrap input:focus{border-color:#3d82f7;}
+        .input-action-btn{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;border-radius:6px;font-size:18px;color:#aaa;line-height:1;transition:color .15s,background .15s;display:none;z-index:2;}
+        .input-action-btn:hover{color:#555;background:#f0f0f8;}
+        .input-action-btn.visible{display:flex;align-items:center;justify-content:center;}
+        #search-btn{padding:14px 26px;font-size:15px;font-weight:600;background:#3d82f7;color:#fff;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;}
+        #search-btn:hover{background:#2e73e8;}
+        #search-btn:disabled{background:#9ab8f0;cursor:not-allowed;}
         .settings-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
         .settings-btn{background:none;border:none;cursor:pointer;font-size:13px;color:#888;display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;transition:background .2s;}
         .settings-btn:hover{background:#e8e8f0;color:#333;}
@@ -203,8 +207,8 @@
 
             /* Search row — stack vertically */
             .search-row{flex-direction:column;gap:8px;}
-            .search-row input{font-size:16px;padding:14px 16px;} /* 16px prevents iOS zoom */
-            .search-row button{width:100%;justify-content:center;padding:14px 20px;font-size:15px;}
+            .input-wrap input{font-size:16px;padding:14px 44px 14px 16px;}
+            #search-btn{width:100%;justify-content:center;padding:14px 20px;font-size:15px;}
 
             /* Settings row — stack */
             .settings-row{flex-direction:column;align-items:flex-start;gap:8px;margin-top:10px;}
@@ -306,7 +310,13 @@
         <span class="brand-pill pill-tw">𝕏 Twitter/X</span>
     </div>
     <div class="search-row">
-        <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, or Twitter/X link…" autocomplete="off">
+        <div class="input-wrap">
+            <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, or Twitter/X link…" autocomplete="off">
+            <!-- Paste button: shown when input is empty -->
+            <button class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
+            <!-- Clear button: shown when input has text -->
+            <button class="input-action-btn" id="clear-btn" title="Clear" onclick="clearInput()">✕</button>
+        </div>
         <button id="search-btn" onclick="handleSearch()">
             <span id="search-text">Search</span>
             <span class="spin" id="search-spin"></span>
@@ -541,7 +551,9 @@ async function handleSearch() {
         const dr   = await post('/api/detect', { url });
         const type = dr.url_type;
 
-        if (type === 'twitter_video') {
+        if (type === 'twitter_profile') {
+            showMsg('⚠️ Twitter/X profile pages are not supported. Please paste a direct tweet link — it should contain "/status/" in the URL.', 'error');
+        } else if (type === 'twitter_video') {
             currentPlatform = 'twitter';
             await loadSinglePost(url, 'twitter');
         } else if (type === 'yt_video') {
@@ -856,8 +868,19 @@ function showSinglePreview(p) {
     const captionEl = document.getElementById('s-caption');
     const desc = p.description || '';
     const title = p.title || '';
-    // Only show description if it's different from title (not redundant)
     captionEl.textContent = (desc && desc !== title) ? desc : '';
+
+    // Text-only tweet — disable download button and show notice
+    const dlBtn  = document.getElementById('s-dl-btn');
+    const dlText = document.getElementById('s-dl-text');
+    if (p.no_video) {
+        dlBtn.disabled = true;
+        dlText.textContent = '📝 Text-only tweet — no video';
+        showMsg('This tweet contains text only. There is no video or image to download.', 'info');
+    } else {
+        dlBtn.disabled = false;
+        dlText.textContent = 'Download';
+    }
 
     show('single-result');
     setTimeout(() => document.getElementById('single-result').scrollIntoView({ behavior: 'smooth' }), 80);
@@ -968,6 +991,36 @@ function renderHistory(){
     if(!dlHistory.length){el.innerHTML='<p style="color:#999;font-size:13px;">No downloads yet</p>';return;}
     el.innerHTML=dlHistory.map(h=>`<div class="history-item"><strong>${esc(h.filename)}</strong><small>${esc(h.size)} · ${esc(h.time)}</small></div>`).join('');
 }
+/* ─── PASTE / CLEAR INPUT ────────────────────────────────────────────── */
+function _syncInputBtns() {
+    const hasText = document.getElementById('ig-url').value.length > 0;
+    document.getElementById('paste-btn').classList.toggle('visible', !hasText);
+    document.getElementById('clear-btn').classList.toggle('visible',  hasText);
+}
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        const input = document.getElementById('ig-url');
+        input.value = text.trim();
+        _syncInputBtns();
+        input.focus();
+    } catch(e) {
+        // Clipboard API blocked (e.g. non-HTTPS) — just focus the field
+        document.getElementById('ig-url').focus();
+    }
+}
+function clearInput() {
+    const input = document.getElementById('ig-url');
+    input.value = '';
+    _syncInputBtns();
+    input.focus();
+    hideMsg();
+    hide('single-result');
+    hide('profile-result');
+    document.getElementById('ready-card').style.display = 'none';
+}
+document.getElementById('ig-url').addEventListener('input', _syncInputBtns);
+
 document.getElementById('ig-url').addEventListener('keypress',e=>{if(e.key==='Enter')handleSearch();});
 </script>
 </body>

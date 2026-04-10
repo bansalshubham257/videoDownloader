@@ -1061,48 +1061,97 @@ def download_twitter(url, quality='best'):
 
 
 def download_pinterest(url):
-    """Download a Pinterest video or image pin using yt-dlp."""
-    try:
-        logger.info(f"📌 Pinterest download: {url}")
-        # If ffmpeg is unavailable, avoid requesting separate video+audio streams.
-        # This prevents yt-dlp merge failures on hosts without ffmpeg installed.
-        fmt = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best' if FFMPEG_AVAILABLE else 'best[ext=mp4]/best'
+    """Download a Pinterest video or image pin using yt-dlp.
+
+    Uses a progressive format fallback chain so the download works on
+    environments without ffmpeg (e.g. Railway), where yt-dlp cannot merge
+    separate video+audio streams.
+    """
+
+    def _try_download(fmt, merge=False):
+        """Attempt one yt-dlp download with the given format string.
+        Returns the jsonify response on success, None on failure.
+        Raises on non-format errors so the outer loop can surface them.
+        """
         ydl_opts = {
-            'format':         fmt,
-            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
-            'quiet':          True,
-            'no_warnings':    True,
-            'socket_timeout': 60,
-            'retries':        3,
+            'format':          fmt,
+            'outtmpl':         os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':           True,
+            'no_warnings':     True,
+            'socket_timeout':  60,
+            'retries':         3,
+            # Never abort just because a format isn't available – let our loop handle it
+            'ignoreerrors':    False,
         }
-        if FFMPEG_AVAILABLE:
+        if merge and FFMPEG_AVAILABLE:
             ydl_opts['merge_output_format'] = 'mp4'
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            if info:
-                filename = ydl.prepare_filename(info)
-                if not os.path.exists(filename):
-                    base = os.path.splitext(filename)[0]
-                    for ext in ('mp4', 'jpg', 'jpeg', 'png', 'webp', 'mkv', 'mp3', 'm4a'):
-                        candidate = f"{base}.{ext}"
-                        if os.path.exists(candidate):
-                            filename = candidate
-                            break
-                if os.path.exists(filename):
-                    file_size = os.path.getsize(filename)
-                    logger.info(f"✅ Pinterest: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                    return jsonify({
-                        'success':   True,
-                        'filename':  os.path.basename(filename),
-                        'file_size': f"{file_size/(1024*1024):.2f} MB",
-                    })
+            if not info:
+                return None
+            filename = ydl.prepare_filename(info)
+            if not os.path.exists(filename):
+                base = os.path.splitext(filename)[0]
+                for ext in ('mp4', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'webp', 'mp3', 'm4a'):
+                    candidate = f"{base}.{ext}"
+                    if os.path.exists(candidate):
+                        filename = candidate
+                        break
+            if os.path.exists(filename):
+                file_size = os.path.getsize(filename)
+                logger.info(f"✅ Pinterest: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
         return None
-    except Exception as e:
-        err = str(e).lower()
-        if 'no video' in err or 'no media' in err:
-            return jsonify({'error': '🖼️ This pin has no downloadable video. Image-only pins are not supported yet.'}), 400
-        logger.warning(f"⚠️ Pinterest download failed: {e}")
-        return None
+
+    # ── Format fallback chain ──────────────────────────────────────────
+    # Each entry: (format_string, use_merge)
+    # Ordered from best quality to broadest fallback.
+    # Formats without ext restrictions always have something available.
+    candidates = []
+    if FFMPEG_AVAILABLE:
+        candidates = [
+            ('bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio', True),
+            ('best[ext=mp4]/best',                                         False),
+            ('best',                                                        False),
+        ]
+    else:
+        candidates = [
+            ('best[ext=mp4]/best',  False),   # single-stream mp4 when available
+            ('best',                False),   # any single-stream format – always works
+        ]
+
+    logger.info(f"📌 Pinterest download: {url} | ffmpeg={FFMPEG_AVAILABLE}")
+
+    last_error = None
+    for fmt, merge in candidates:
+        try:
+            logger.info(f"   ↳ trying fmt: {fmt}")
+            result = _try_download(fmt, merge)
+            if result is not None:
+                return result
+        except Exception as e:
+            err_lower = str(e).lower()
+            if 'requested format is not available' in err_lower or \
+               'no video formats found' in err_lower or \
+               'format is not available' in err_lower:
+                logger.warning(f"   ✗ format unavailable, trying next: {e}")
+                last_error = e
+                continue   # try next candidate
+            # Non-format error – surface it immediately
+            logger.warning(f"⚠️ Pinterest download failed: {e}")
+            err = err_lower
+            if 'no video' in err or 'no media' in err:
+                return jsonify({'error': '🖼️ This pin has no downloadable video. Image-only pins are not supported yet.'}), 400
+            return None
+
+    # All candidates exhausted
+    logger.warning(f"⚠️ Pinterest download failed after all fallbacks: {last_error}")
+    return None
 
 
 FACEBOOK_FORMATS = {

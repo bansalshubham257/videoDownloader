@@ -41,6 +41,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("🚀 Starting Instagram Downloader - Multi-Method Version")
 
+# ── Auto-generate OG image if missing ───────────────────────────────────────
+try:
+    _og_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'og-image.png')
+    if not os.path.exists(_og_path):
+        from generate_og_image import generate_og_image
+        generate_og_image(_og_path)
+except Exception as _og_err:
+    pass  # Non-fatal – site still works without the OG image
+
 FFMPEG_AVAILABLE = shutil.which('ffmpeg') is not None
 if FFMPEG_AVAILABLE:
     logger.info("✅ ffmpeg available")

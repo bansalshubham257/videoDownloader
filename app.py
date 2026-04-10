@@ -235,7 +235,7 @@ def robots():
 Allow: /
 Disallow: /api/
 
-Sitemap: https://grabvid.app/sitemap.xml
+Sitemap: https://freedownloadclips.com/sitemap.xml
 """
     return Response(txt, mimetype='text/plain')
 
@@ -245,7 +245,7 @@ def sitemap():
     xml = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://grabvid.app/</loc>
+    <loc>https://freedownloadclips.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -1762,7 +1762,7 @@ def status():
     })
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
+    port = int(os.environ.get('PORT', 8000))
     debug = not IS_PRODUCTION
     app.run(debug=debug, host='0.0.0.0', port=port)
 

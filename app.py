@@ -8,6 +8,7 @@ import logging
 import sys
 import time
 import random
+import shutil
 from collections import defaultdict
 from threading import Lock
 from queue import Queue, Empty
@@ -39,6 +40,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 logger.info("🚀 Starting Instagram Downloader - Multi-Method Version")
+
+FFMPEG_AVAILABLE = shutil.which('ffmpeg') is not None
+if FFMPEG_AVAILABLE:
+    logger.info("✅ ffmpeg available")
+else:
+    logger.warning("⚠️ ffmpeg not available - using non-merge media formats where possible")
 
 # Try to import yt-dlp
 try:
@@ -1057,15 +1064,19 @@ def download_pinterest(url):
     """Download a Pinterest video or image pin using yt-dlp."""
     try:
         logger.info(f"📌 Pinterest download: {url}")
+        # If ffmpeg is unavailable, avoid requesting separate video+audio streams.
+        # This prevents yt-dlp merge failures on hosts without ffmpeg installed.
+        fmt = 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best' if FFMPEG_AVAILABLE else 'best[ext=mp4]/best'
         ydl_opts = {
-            'format':         'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+            'format':         fmt,
             'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
             'quiet':          True,
             'no_warnings':    True,
             'socket_timeout': 60,
             'retries':        3,
-            'merge_output_format': 'mp4',
         }
+        if FFMPEG_AVAILABLE:
+            ydl_opts['merge_output_format'] = 'mp4'
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if info:

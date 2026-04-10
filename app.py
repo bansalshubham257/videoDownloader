@@ -160,11 +160,20 @@ def detect_url_type(url):
     Returns one of:
       YouTube  → 'yt_video' | 'yt_playlist' | 'yt_channel'
       Instagram→ 'profile'  | 'post'        | 'reel'
-      Twitter  → 'twitter_video'
+      Twitter  → 'twitter_video'  | 'twitter_profile'
+      TikTok   → 'tiktok_video'   | 'tiktok_profile'
+      Facebook → 'facebook_video' | 'facebook_profile'
+      Pinterest→ 'pinterest_post' | 'pinterest_profile'
       Other    → 'unknown'
     """
     import re
     clean = url.split('?')[0].split('#')[0].rstrip('/')
+
+    # ── TikTok ────────────────────────────────────────────────────────────
+    if 'tiktok.com' in url:
+        if '/video/' in url or 'vm.tiktok.com' in url or 'vt.tiktok.com' in url:
+            return 'tiktok_video'
+        return 'tiktok_profile'
 
     # ── Facebook ──────────────────────────────────────────────────────────
     if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
@@ -211,6 +220,30 @@ def detect_url_type(url):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/robots.txt')
+def robots():
+    txt = """User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://grabvid.app/sitemap.xml
+"""
+    return Response(txt, mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+def sitemap():
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://grabvid.app/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>"""
+    return Response(xml, mimetype='application/xml')
 
 
 # ── /api/detect ──────────────────────────────────────────────────────────────
@@ -562,6 +595,7 @@ def get_preview():
             and 'facebook.com' not in instagram_url
             and 'fb.watch' not in instagram_url
             and 'fb.com' not in instagram_url
+            and 'tiktok.com' not in instagram_url
         ):
             return jsonify({'error': 'Invalid URL'}), 400
         
@@ -707,6 +741,15 @@ def download():
         if not url:
             return jsonify({'error': 'URL required'}), 400
 
+        # ── TikTok ──
+        if 'tiktok.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_tiktok(url, quality)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'TikTok download failed. The video may be private or region-restricted.'}), 400
+
         # ── Facebook ──
         if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
             if not YTDLP_AVAILABLE:
@@ -807,6 +850,61 @@ TWITTER_FORMATS = {
     '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
     'audio': 'bestaudio',
 }
+
+# TikTok typically maxes out at 720p
+TIKTOK_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+
+def download_tiktok(url, quality='best'):
+    """Download a TikTok video using yt-dlp."""
+    try:
+        fmt      = TIKTOK_FORMATS.get(quality, TIKTOK_FORMATS['best'])
+        is_audio = (quality == 'audio')
+        logger.info(f"🎵 TikTok download: quality={quality} | fmt={fmt[:50]}")
+
+        ydl_opts = {
+            'format':         fmt,
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
+        }
+        if not is_audio:
+            ydl_opts['merge_output_format'] = 'mp4'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ TikTok: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'private' in err or 'login' in err:
+            return jsonify({'error': '🔒 This TikTok video is private or requires login.'}), 400
+        logger.warning(f"⚠️ TikTok download failed: {e}")
+        return None
 
 
 def download_twitter(url, quality='best'):
@@ -1537,20 +1635,23 @@ def proxy_thumbnail():
     allowed = ('instagram.com', 'cdninstagram.com', 'fbcdn.net', 'fbsbx.com',
                'ytimg.com', 'ggpht.com', 'googleusercontent.com',
                'twimg.com', 'pbs.twimg.com',
-               'pinimg.com', 'i.pinimg.com')      # Pinterest image CDN
+               'pinimg.com', 'i.pinimg.com',
+               'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktok.com')
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
         is_twitter   = 'twimg.com' in img_url
         is_pinterest = 'pinimg.com' in img_url
+        is_tiktok    = 'tiktok' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
-            'Referer':    'https://www.pinterest.com/' if is_pinterest
-                          else ('https://twitter.com/' if is_twitter
-                          else 'https://www.instagram.com/'),
+            'Referer':    ('https://www.tiktok.com/' if is_tiktok
+                           else 'https://www.pinterest.com/' if is_pinterest
+                           else 'https://twitter.com/' if is_twitter
+                           else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        if not is_twitter and not is_pinterest:
+        if not is_twitter and not is_pinterest and not is_tiktok:
             cookies = load_cookies()
             if cookies:
                 headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)

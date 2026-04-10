@@ -166,6 +166,19 @@ def detect_url_type(url):
     import re
     clean = url.split('?')[0].split('#')[0].rstrip('/')
 
+    # ── Facebook ──────────────────────────────────────────────────────────
+    if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
+        if ('/watch' in url or '/videos/' in url or '/video/' in url
+                or '/reel/' in url or 'fb.watch' in url or 'video_id' in url):
+            return 'facebook_video'
+        return 'facebook_profile'   # page / profile / group — not downloadable
+
+    # ── Pinterest ─────────────────────────────────────────────────────────
+    if 'pinterest.com' in url or 'pinterest.co' in url or 'pin.it' in url:
+        if '/pin/' in url or 'pin.it' in url:
+            return 'pinterest_post'    # individual pin
+        return 'pinterest_profile'     # profile or board — not downloadable
+
     # ── Twitter / X ───────────────────────────────────────────────────────
     if 'twitter.com' in url or 'x.com' in url:
         if '/status/' in url:
@@ -211,8 +224,14 @@ def detect():
         and 'youtu.be' not in url
         and 'twitter.com' not in url
         and 'x.com' not in url
+        and 'pinterest.com' not in url
+        and 'pinterest.co' not in url
+        and 'pin.it' not in url
+        and 'facebook.com' not in url
+        and 'fb.watch' not in url
+        and 'fb.com' not in url
     ):
-        return jsonify({'error': 'Not a recognised Instagram, YouTube, or Twitter/X URL'}), 400
+        return jsonify({'error': 'Not a recognised Instagram, YouTube, Twitter/X, Pinterest, or Facebook URL'}), 400
     return jsonify({'url_type': detect_url_type(url)})
 
 
@@ -537,6 +556,12 @@ def get_preview():
             and 'youtu.be' not in instagram_url
             and 'twitter.com' not in instagram_url
             and 'x.com' not in instagram_url
+            and 'pinterest.com' not in instagram_url
+            and 'pinterest.co' not in instagram_url
+            and 'pin.it' not in instagram_url
+            and 'facebook.com' not in instagram_url
+            and 'fb.watch' not in instagram_url
+            and 'fb.com' not in instagram_url
         ):
             return jsonify({'error': 'Invalid URL'}), 400
         
@@ -682,6 +707,24 @@ def download():
         if not url:
             return jsonify({'error': 'URL required'}), 400
 
+        # ── Facebook ──
+        if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_facebook(url, quality)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'Facebook download failed. The video may be private or login-protected.'}), 400
+
+        # ── Pinterest ──
+        if 'pinterest.com' in url or 'pinterest.co' in url or 'pin.it' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_pinterest(url)
+            if result and result.status_code == 200:
+                return result
+            return jsonify({'error': 'Pinterest download failed. The pin may contain no video/image, or may be private.'}), 400
+
         # ── Twitter / X ──
         if 'twitter.com' in url or 'x.com' in url:
             if not YTDLP_AVAILABLE:
@@ -811,6 +854,102 @@ def download_twitter(url, quality='best'):
         if 'guest token' in err or 'bad guest' in err:
             return jsonify({'error': '⚠️ Twitter API temporarily unavailable. Please try again in a moment.'}), 400
         logger.warning(f"⚠️ Twitter download failed: {e}")
+        return None
+
+
+def download_pinterest(url):
+    """Download a Pinterest video or image pin using yt-dlp."""
+    try:
+        logger.info(f"📌 Pinterest download: {url}")
+        ydl_opts = {
+            'format':         'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
+            'merge_output_format': 'mp4',
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'jpg', 'jpeg', 'png', 'webp', 'mkv', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Pinterest: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'no video' in err or 'no media' in err:
+            return jsonify({'error': '🖼️ This pin has no downloadable video. Image-only pins are not supported yet.'}), 400
+        logger.warning(f"⚠️ Pinterest download failed: {e}")
+        return None
+
+
+FACEBOOK_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+
+def download_facebook(url, quality='best'):
+    """Download a Facebook video using yt-dlp."""
+    try:
+        fmt = FACEBOOK_FORMATS.get(quality, FACEBOOK_FORMATS['best'])
+        is_audio = (quality == 'audio')
+        logger.info(f"📘 Facebook download: quality={quality} | fmt={fmt[:50]}")
+
+        ydl_opts = {
+            'format':         fmt,
+            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            'quiet':          True,
+            'no_warnings':    True,
+            'socket_timeout': 60,
+            'retries':        3,
+        }
+        if not is_audio:
+            ydl_opts['merge_output_format'] = 'mp4'
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if info:
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ Facebook: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+        return None
+    except Exception as e:
+        err = str(e).lower()
+        if 'login' in err or 'private' in err or 'not available' in err:
+            return jsonify({'error': '🔒 This Facebook video is private or requires login to download.'}), 400
+        logger.warning(f"⚠️ Facebook download failed: {e}")
         return None
 
 
@@ -1397,18 +1536,21 @@ def proxy_thumbnail():
     # Only allow Instagram / Facebook / YouTube CDN domains
     allowed = ('instagram.com', 'cdninstagram.com', 'fbcdn.net', 'fbsbx.com',
                'ytimg.com', 'ggpht.com', 'googleusercontent.com',
-               'twimg.com', 'pbs.twimg.com')          # Twitter/X image CDN
+               'twimg.com', 'pbs.twimg.com',
+               'pinimg.com', 'i.pinimg.com')      # Pinterest image CDN
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
-        is_twitter = 'twimg.com' in img_url
+        is_twitter   = 'twimg.com' in img_url
+        is_pinterest = 'pinimg.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
-            'Referer':    'https://twitter.com/' if is_twitter else 'https://www.instagram.com/',
+            'Referer':    'https://www.pinterest.com/' if is_pinterest
+                          else ('https://twitter.com/' if is_twitter
+                          else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        # Forward Instagram session cookie only for Instagram CDN
-        if not is_twitter:
+        if not is_twitter and not is_pinterest:
             cookies = load_cookies()
             if cookies:
                 headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)

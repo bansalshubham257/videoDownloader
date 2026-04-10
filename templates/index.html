@@ -3,11 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+    <!-- ── Primary SEO ── -->
+    <title>Free Video Downloader — Instagram, YouTube, Twitter, Facebook & Pinterest</title>
+    <meta name="description" content="Download videos and photos from Instagram, YouTube, Twitter/X, Facebook, and Pinterest for free. No login required. Supports HD, 1080p, 720p, MP3 audio. Fast & mobile-friendly.">
+    <meta name="keywords" content="video downloader, instagram downloader, youtube downloader, twitter video downloader, facebook video downloader, pinterest downloader, reels downloader, shorts downloader, free video download, online video downloader">
+    <meta name="robots" content="index, follow">
+    <meta name="author" content="GrabVid">
+    <link rel="canonical" href="https://grabvid.app/">
+
+    <!-- ── Open Graph (Facebook / WhatsApp / LinkedIn previews) ── -->
+    <meta property="og:type"        content="website">
+    <meta property="og:url"         content="https://grabvid.app/">
+    <meta property="og:site_name"   content="GrabVid">
+    <meta property="og:title"       content="Free Video Downloader — Instagram, YouTube, Twitter, Facebook & Pinterest">
+    <meta property="og:description" content="Download videos & photos from Instagram, YouTube, Twitter/X, Facebook and Pinterest. Free, fast, no login needed. HD quality supported.">
+    <meta property="og:image"       content="https://grabvid.app/static/og-image.png">
+    <meta property="og:image:width"  content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:locale"      content="en_US">
+
+    <!-- ── Twitter Card ── -->
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:site"        content="@grabvidapp">
+    <meta name="twitter:title"       content="Free Video Downloader — Instagram, YouTube, Twitter & More">
+    <meta name="twitter:description" content="Download videos & photos from Instagram, YouTube, Twitter/X, Facebook and Pinterest. Free, no login required.">
+    <meta name="twitter:image"       content="https://grabvid.app/static/og-image.png">
+
+    <!-- ── Favicon ── -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📥</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📥</text></svg>">
+
+    <!-- ── PWA / Mobile ── -->
     <meta name="theme-color" content="#3d82f7">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Instagram & YouTube Downloader</title>
+    <meta name="apple-mobile-web-app-title" content="GrabVid">
+
+    <!-- ── JSON-LD Structured Data ── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "GrabVid — Free Video Downloader",
+      "url": "https://grabvid.app",
+      "description": "Download videos and photos from Instagram, YouTube, Twitter/X, Facebook, and Pinterest for free. Supports HD, 1080p, 720p, MP3 audio.",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Instagram video and photo download",
+        "YouTube video download up to 1080p",
+        "Twitter/X video download",
+        "Facebook video download",
+        "Pinterest video download",
+        "MP3 audio extraction",
+        "No login or registration required",
+        "Mobile friendly"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I download an Instagram video?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Paste the Instagram post or reel URL into the search box and click Search. Then choose your format and click Download."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I download YouTube videos in HD?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. After pasting a YouTube URL select 1080p, 720p or Best quality and click Download."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is this video downloader free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, GrabVid is completely free with no login or registration required."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which platforms are supported?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Instagram, YouTube, Twitter/X, Facebook, and Pinterest are all supported."
+          }
+        }
+      ]
+    }
+    </script>
+
     <style>
         *{margin:0;padding:0;box-sizing:border-box;}
         body{background:#f0f0f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;padding:40px 20px;}
@@ -22,6 +123,7 @@
         .pill-tw{background:#e8f5fd;color:#1a8cd8;}
         .pill-pi{background:#fce8e8;color:#e60023;}
         .pill-fb{background:#e7f0fd;color:#1877f2;}
+        .pill-tk{background:#f0f0f0;color:#010101;}
         .search-row{display:flex;gap:10px;}
         .input-wrap{flex:1;position:relative;display:flex;align-items:center;}
         .input-wrap input{width:100%;padding:14px 44px 14px 18px;font-size:15px;border:1.5px solid #ddd;border-radius:10px;outline:none;background:#fff;transition:border-color .2s;}
@@ -91,6 +193,7 @@
         .thumb-wrap{position:relative;width:100%;background:#111;min-height:120px;}
         .thumb-wrap.ratio-16-9{aspect-ratio:16/9;}
         .thumb-wrap.ratio-1-1{aspect-ratio:1/1;}
+        .thumb-wrap.ratio-9-16{aspect-ratio:9/16;max-height:480px;}
         .thumb-wrap img{width:100%;height:100%;display:block;object-fit:cover;}
         .vc{position:absolute;top:10px;right:10px;display:flex;gap:7px;}
         .vc button{background:rgba(0,0,0,.45);border:none;color:#fff;width:32px;height:32px;border-radius:6px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
@@ -108,8 +211,11 @@
         .dl-btn-wrap button.pi-btn:hover{background:#b8001c;}
         .dl-btn-wrap button.fb-btn{background:#1877f2;}
         .dl-btn-wrap button.fb-btn:hover{background:#0d65d9;}
+        .dl-btn-wrap button.tk-btn{background:#010101;}
+        .dl-btn-wrap button.tk-btn:hover{background:#333;}
         .yt-q-btn.tw-active{border-color:#1a8cd8;background:#e8f5fd;color:#1570b0;}
         .yt-q-btn.fb-active{border-color:#1877f2;background:#e7f0fd;color:#0d65d9;}
+        .yt-q-btn.tk-active{border-color:#fe2c55;background:#fff0f2;color:#fe2c55;}
         .caption{max-width:640px;margin:0 auto 28px;font-size:14px;color:#333;line-height:1.7;}
 
         /* ── Copy button ── */
@@ -310,24 +416,26 @@
 <body>
 
 <!-- Lightbox -->
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
-    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
-    <img id="lightbox-img" src="" alt="">
+<div class="lightbox" id="lightbox" onclick="closeLightbox()" role="dialog" aria-modal="true" aria-label="Image preview">
+    <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close preview">✕</button>
+    <img id="lightbox-img" src="" alt="Media preview">
 </div>
 
+<header>
 <!-- Search -->
 <div class="search-wrap">
-    <h1>📥 Media Downloader</h1>
+    <h1>📥 Free Video Downloader</h1>
     <div class="brand-pills">
         <span class="brand-pill pill-ig">📸 Instagram</span>
         <span class="brand-pill pill-yt">▶️ YouTube</span>
         <span class="brand-pill pill-tw">𝕏 Twitter/X</span>
         <span class="brand-pill pill-pi">📌 Pinterest</span>
         <span class="brand-pill pill-fb">📘 Facebook</span>
+        <span class="brand-pill pill-tk">🎵 TikTok</span>
     </div>
     <div class="search-row">
         <div class="input-wrap">
-            <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, Twitter/X, Pinterest, or Facebook link…" autocomplete="off">
+            <input type="url" id="ig-url" placeholder="Paste Instagram, YouTube, TikTok, Twitter/X, Facebook or Pinterest link…" autocomplete="off">
             <!-- Paste button: shown when input is empty -->
             <button class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
             <!-- Clear button: shown when input has text -->
@@ -386,8 +494,10 @@
             <li>Copy the <strong>sessionid</strong> value and paste above.</li>
         </ol>
     </div>
-</div>
+</div><!-- /settings-panel -->
+</header>
 
+<main>
 <div id="msg"></div>
 
 <!-- ── Single result (Instagram post OR YouTube video) ── -->
@@ -431,6 +541,15 @@
         <button class="yt-q-btn"           data-q="480p"  onclick="setFbQuality(this)">📺 SD 480p</button>
         <button class="yt-q-btn"           data-q="360p"  onclick="setFbQuality(this)">📱 360p</button>
         <button class="yt-q-btn"           data-q="audio" onclick="setFbQuality(this)">🎵 Audio</button>
+    </div>
+
+    <!-- TikTok quality selector -->
+    <div class="yt-quality-row" id="tk-quality-row">
+        <button class="yt-q-btn tk-active" data-q="best"  onclick="setTkQuality(this)">🏆 Best</button>
+        <button class="yt-q-btn"           data-q="720p"  onclick="setTkQuality(this)">📹 720p</button>
+        <button class="yt-q-btn"           data-q="480p"  onclick="setTkQuality(this)">📺 480p</button>
+        <button class="yt-q-btn"           data-q="360p"  onclick="setTkQuality(this)">📱 360p</button>
+        <button class="yt-q-btn"           data-q="audio" onclick="setTkQuality(this)">🎵 Audio</button>
     </div>
 
     <div class="media-card">
@@ -507,17 +626,37 @@
 </div>
 
 <!-- History -->
-<div class="history-section">
+<div class="history-section" role="complementary" aria-label="Recent downloads">
     <h3>Recent Downloads</h3>
     <div id="history-list"><p style="color:#999;font-size:13px;">No downloads yet</p></div>
 </div>
 
+</main>
+
+<!-- SEO Footer -->
+<footer style="max-width:960px;margin:40px auto 0;padding:30px 20px 40px;border-top:1px solid #e0e0ec;text-align:center;">
+    <p style="font-size:13px;color:#888;margin-bottom:12px;">
+        <strong style="color:#555;">GrabVid</strong> — Free online video downloader. Download videos &amp; photos from
+        <a href="/" style="color:#c2185b;text-decoration:none;">Instagram</a>,
+        <a href="/" style="color:#c62828;text-decoration:none;">YouTube</a>,
+        <a href="/" style="color:#1a8cd8;text-decoration:none;">Twitter/X</a>,
+        <a href="/" style="color:#1a8cd8;text-decoration:none;">Tiktok</a>,
+        <a href="/" style="color:#1877f2;text-decoration:none;">Facebook</a>, and
+        <a href="/" style="color:#e60023;text-decoration:none;">Pinterest</a>.
+        No login required. HD &amp; MP3 supported.
+    </p>
+    <p style="font-size:11px;color:#bbb;">
+        ⚠️ Only download content you own or have permission to download. Respect copyright and platform terms of service.
+    </p>
+</footer>
+
 <script>
 let currentUrl      = '';
-let currentPlatform = 'instagram';   // 'instagram' | 'youtube' | 'twitter' | 'pinterest' | 'facebook'
-let ytQuality       = 'best';
-let twQuality       = 'best';
-let fbQuality       = 'best';
+let currentPlatform = 'instagram';   // 'instagram'|'youtube'|'twitter'|'pinterest'|'facebook'|'tiktok'
+let ytQuality = 'best';
+let twQuality = 'best';
+let fbQuality = 'best';
+let tkQuality = 'best';
 let previewData     = null;
 let dlHistory = JSON.parse(localStorage.getItem('igDlHistory') || '[]').slice(0, 5);
 renderHistory();
@@ -577,6 +716,13 @@ function setFbQuality(btn) {
     fbQuality = btn.dataset.q;
 }
 
+/* ─── TikTok quality ─────────────────────────────────────────────────── */
+function setTkQuality(btn) {
+    document.querySelectorAll('#tk-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','tk-active'));
+    btn.classList.add('tk-active');
+    tkQuality = btn.dataset.q;
+}
+
 /* ─── SEARCH ─────────────────────────────────────────────────────────── */
 async function handleSearch() {
     const url = document.getElementById('ig-url').value.trim();
@@ -584,8 +730,9 @@ async function handleSearch() {
     if (!url.includes('instagram.com') && !url.includes('youtube.com') && !url.includes('youtu.be')
         && !url.includes('twitter.com') && !url.includes('x.com')
         && !url.includes('pinterest.com') && !url.includes('pinterest.co') && !url.includes('pin.it')
-        && !url.includes('facebook.com') && !url.includes('fb.watch') && !url.includes('fb.com'))
-        return showMsg('Please paste an Instagram, YouTube, Twitter/X, Pinterest, or Facebook link', 'error');
+        && !url.includes('facebook.com') && !url.includes('fb.watch') && !url.includes('fb.com')
+        && !url.includes('tiktok.com'))
+        return showMsg('Please paste an Instagram, YouTube, TikTok, Twitter/X, Pinterest, or Facebook link', 'error');
 
     currentUrl = url;
     setBusy('search', true);
@@ -598,7 +745,12 @@ async function handleSearch() {
         const dr   = await post('/api/detect', { url });
         const type = dr.url_type;
 
-        if (type === 'facebook_video') {
+        if (type === 'tiktok_video') {
+            currentPlatform = 'tiktok';
+            await loadSinglePost(url, 'tiktok');
+        } else if (type === 'tiktok_profile') {
+            showMsg('⚠️ TikTok profile pages are not supported. Please paste a direct video link — it should contain "/video/" in the URL.', 'error');
+        } else if (type === 'facebook_video') {
             currentPlatform = 'facebook';
             await loadSinglePost(url, 'facebook');
         } else if (type === 'facebook_profile') {
@@ -866,29 +1018,23 @@ async function loadSinglePost(url, platform) {
     const ytOpts = document.getElementById('yt-quality-row');
     const twOpts = document.getElementById('tw-quality-row');
     const fbOpts = document.getElementById('fb-quality-row');
+    const tkOpts = document.getElementById('tk-quality-row');
     const dlBtn  = document.getElementById('s-dl-btn');
 
-    // Reset all selectors
+    // Reset all
     igOpts.style.display = 'none';
     ytOpts.classList.remove('show');
     twOpts.classList.remove('show');
     fbOpts.classList.remove('show');
-    dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn');
+    tkOpts.classList.remove('show');
+    dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn');
 
-    if (platform === 'youtube') {
-        ytOpts.classList.add('show');
-        dlBtn.classList.add('yt-btn');
-    } else if (platform === 'twitter') {
-        twOpts.classList.add('show');
-        dlBtn.classList.add('tw-btn');
-    } else if (platform === 'facebook') {
-        fbOpts.classList.add('show');
-        dlBtn.classList.add('fb-btn');
-    } else if (platform === 'pinterest') {
-        dlBtn.classList.add('pi-btn');
-    } else {
-        igOpts.style.display = 'flex';
-    }
+    if      (platform === 'youtube')   { ytOpts.classList.add('show'); dlBtn.classList.add('yt-btn'); }
+    else if (platform === 'twitter')   { twOpts.classList.add('show'); dlBtn.classList.add('tw-btn'); }
+    else if (platform === 'facebook')  { fbOpts.classList.add('show'); dlBtn.classList.add('fb-btn'); }
+    else if (platform === 'tiktok')    { tkOpts.classList.add('show'); dlBtn.classList.add('tk-btn'); }
+    else if (platform === 'pinterest') { dlBtn.classList.add('pi-btn'); }
+    else                               { igOpts.style.display = 'flex'; }
 
     try {
         const data = await post('/api/preview', { url });
@@ -916,7 +1062,10 @@ function showSinglePreview(p) {
         thumbWrap.classList.remove('ratio-16-9', 'ratio-1-1');
         thumbWrap.classList.add(
             (currentPlatform === 'youtube' || currentPlatform === 'twitter' || currentPlatform === 'facebook')
-            ? 'ratio-16-9' : 'ratio-1-1'
+            ? 'ratio-16-9'
+            : currentPlatform === 'tiktok'
+            ? 'ratio-9-16'
+            : 'ratio-1-1'
         );
     }
 
@@ -962,15 +1111,12 @@ async function singleDownload() {
     document.getElementById('ready-card').style.display = 'none';
     hideMsg();
 
-    const body = currentPlatform === 'youtube'
-        ? { url: currentUrl, quality: ytQuality }
-        : currentPlatform === 'twitter'
-        ? { url: currentUrl, quality: twQuality }
-        : currentPlatform === 'facebook'
-        ? { url: currentUrl, quality: fbQuality }
-        : currentPlatform === 'pinterest'
-        ? { url: currentUrl }
-        : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
+    const body = currentPlatform === 'youtube'   ? { url: currentUrl, quality: ytQuality }
+               : currentPlatform === 'twitter'   ? { url: currentUrl, quality: twQuality }
+               : currentPlatform === 'facebook'  ? { url: currentUrl, quality: fbQuality }
+               : currentPlatform === 'tiktok'    ? { url: currentUrl, quality: tkQuality }
+               : currentPlatform === 'pinterest' ? { url: currentUrl }
+               : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
 
     try {
         const data = await post('/api/download', body);

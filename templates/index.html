@@ -48,73 +48,73 @@
     <meta name="apple-mobile-web-app-title" content="QuickSaveVideos">
 
     <script>(function(s){s.dataset.zone='10859427',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
-    
+
     <!-- ── JSON-LD Structured Data ── -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "QuickSaveVideos — Video Downloader",
-      "url": "https://quicksavevideos.com",
-      "description": "Download videos and photos from Instagram, YouTube, Twitter/X, Facebook, and Pinterest for free. Supports HD, 1080p, 720p, MP3 audio.",
-      "applicationCategory": "MultimediaApplication",
-      "operatingSystem": "Any",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "featureList": [
-        "Instagram video and photo download",
-        "YouTube video download up to 1080p",
-        "Twitter/X video download",
-        "Facebook video download",
-        "Pinterest video download",
-        "MP3 audio extraction",
-        "No login or registration required",
-        "Mobile friendly"
-      ]
-    }
+        {
+            "@context": "https://schema.org",
+            "@type": "WebApplication",
+            "name": "QuickSaveVideos — Video Downloader",
+            "url": "https://quicksavevideos.com",
+            "description": "Download videos and photos from Instagram, YouTube, Twitter/X, Facebook, and Pinterest for free. Supports HD, 1080p, 720p, MP3 audio.",
+            "applicationCategory": "MultimediaApplication",
+            "operatingSystem": "Any",
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD"
+            },
+            "featureList": [
+                "Instagram video and photo download",
+                "YouTube video download up to 1080p",
+                "Twitter/X video download",
+                "Facebook video download",
+                "Pinterest video download",
+                "MP3 audio extraction",
+                "No login or registration required",
+                "Mobile friendly"
+            ]
+        }
     </script>
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
         {
-          "@type": "Question",
-          "name": "How do I download an Instagram video?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Paste the Instagram post or reel URL into the search box and click Search. Then choose your format and click Download."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Can I download YouTube videos in HD?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes. After pasting a YouTube URL select 1080p, 720p or Best quality and click Download."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Is this video downloader free?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Yes, QuickSaveVideos is completely free with no login or registration required."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Which platforms are supported?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Instagram, YouTube, Twitter/X, Facebook, and Pinterest are all supported."
-          }
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "How do I download an Instagram video?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Paste the Instagram post or reel URL into the search box and click Search. Then choose your format and click Download."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Can I download YouTube videos in HD?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes. After pasting a YouTube URL select 1080p, 720p or Best quality and click Download."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Is this video downloader free?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Yes, QuickSaveVideos is completely free with no login or registration required."
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "Which platforms are supported?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "Instagram, YouTube, Twitter/X, Facebook, and Pinterest are all supported."
+                    }
+                }
+            ]
         }
-      ]
-    }
     </script>
 
     <style>
@@ -910,6 +910,13 @@
             border-color: #fe2c55;
             background: linear-gradient(135deg, #fe2c55 0%, #eb1e3a 100%);
             color: #fff;
+        }
+
+        /* Auto-download mode: hide manual quality/content selectors */
+        body.auto-download-mode .options-row,
+        body.auto-download-mode .yt-quality-row,
+        body.auto-download-mode .yt-grid-quality {
+            display: none !important;
         }
 
         /* Media Card */
@@ -2212,894 +2219,894 @@
         }
     </style>
 </head>
-<body>
+<body class="auto-download-mode">
 
 <a class="skip-link" href="#main-content">Skip to main content</a>
 
 <div class="page-shell">
 
-<!-- Lightbox -->
-<div class="lightbox" id="lightbox" onclick="closeLightbox()" role="dialog" aria-modal="true" aria-label="Image preview">
-    <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close preview">✕</button>
-    <img id="lightbox-img" src="" alt="Media preview">
-</div>
-
-<header class="hero-header">
-<!-- Search -->
-<div class="search-wrap">
-    <h1>📥 Free Video Downloader</h1>
-    <p class="search-subtitle">Download videos and photos from Instagram, YouTube, Twitter/X, TikTok, Facebook, Pinterest, and more with one clean workflow.</p>
-    <div class="brand-pills">
-        <span class="brand-pill pill-ig">📸 Instagram</span>
-        <span class="brand-pill pill-yt">▶️ YouTube</span>
-        <span class="brand-pill pill-tw">𝕏 Twitter/X</span>
-        <span class="brand-pill pill-pi">📌 Pinterest</span>
-        <span class="brand-pill pill-fb">📘 Facebook</span>
-    </div>
-    <div class="search-row">
-        <div class="input-wrap">
-            <label class="sr-only" for="ig-url">Video URL</label>
-            <input type="url" id="ig-url" placeholder="Paste any video URL — Instagram, YouTube, TikTok, Twitter/X, Facebook, Pinterest, Vimeo…" autocomplete="off" aria-label="Video URL input">
-            <!-- Paste button: shown when input is empty -->
-            <button type="button" class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
-            <!-- Clear button: shown when input has text -->
-            <button type="button" class="input-action-btn" id="clear-btn" title="Clear" onclick="clearInput()">✕</button>
-        </div>
-        <button type="button" id="search-btn" onclick="handleSearch()">
-            <span id="search-text">Search</span>
-            <span class="spin" id="search-spin"></span>
-        </button>
-    </div>
-    <div class="settings-row">
-        <div class="max-posts-row">
-            <label for="max-posts-select">Posts / videos:</label>
-            <select id="max-posts-select">
-                <option value="12">12</option>
-                <option value="25">25</option>
-                <option value="50" selected>50</option>
-                <option value="100">100</option>
-                <option value="200">200</option>
-                <option value="500">All (max 500)</option>
-            </select>
-        </div>
-        <button type="button" class="settings-btn" onclick="toggleSettings()" aria-controls="settings-panel" aria-expanded="false">
-            <span class="cookie-badge" id="cookie-badge"></span>
-            ⚙️ Instagram Login
-        </button>
-    </div>
-</div>
-
-<!-- Settings / Cookie Panel -->
-<div class="settings-panel" id="settings-panel">
-    <h3>🍪 Instagram Session Cookie</h3>
-    <p class="hint">Required only for Instagram profiles (not for YouTube). Add your <strong>sessionid</strong> to fetch more than 12 posts.</p>
-    <div class="field-row">
-        <label for="f-sessionid">sessionid <span style="color:#e74c3c">*</span></label>
-        <input type="password" id="f-sessionid" placeholder="Paste your sessionid cookie value…">
-    </div>
-    <div class="field-row">
-        <label for="f-csrftoken">csrftoken <span style="color:#999">(optional)</span></label>
-        <input type="text" id="f-csrftoken" placeholder="Paste your csrftoken…">
-    </div>
-    <div class="field-row">
-        <label for="f-ds_user_id">ds_user_id <span style="color:#999">(optional)</span></label>
-        <input type="text" id="f-ds_user_id" placeholder="Paste your ds_user_id…">
-    </div>
-    <div class="settings-actions">
-        <button class="save-cookie-btn" onclick="saveCookie()">💾 Save</button>
-        <button class="clear-cookie-btn" onclick="clearCookie()">🗑 Clear</button>
-        <span class="cookie-status-msg" id="cookie-save-msg">✅ Saved!</span>
-    </div>
-    <div class="how-to">
-        <strong>📖 How to get your Instagram session cookie (Chrome / Edge)</strong>
-        <ol>
-            <li>Open <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">instagram.com</a> and log in.</li>
-            <li>Press <kbd>F12</kbd> → <strong>Application</strong> tab → <strong>Cookies → https://www.instagram.com</strong>.</li>
-            <li>Copy the <strong>sessionid</strong> value and paste above.</li>
-        </ol>
-    </div>
-</div><!-- /settings-panel -->
-</header>
-
-<main id="main-content">
-<div id="msg" role="status" aria-live="polite"></div>
-
-
-<!-- ── Single result (Instagram post OR YouTube video) ── -->
-<section id="single-result" aria-labelledby="s-title">
-    <div class="result-title-row">
-        <h2 id="s-title" style="margin-bottom:0;">Search result</h2>
-        <button class="copy-btn" id="s-title-copy" onclick="copyText(document.getElementById('s-title').textContent,this)" title="Copy title">⎘ Copy</button>
-    </div>
-    <p class="s-meta" id="s-meta"></p>
-
-    <!-- Instagram options -->
-    <div class="options-row" id="ig-options">
-        <label><input type="radio" name="ctype" value="both" checked> 📹🔊 Both</label>
-        <label><input type="radio" name="ctype" value="video"> 📹 Video</label>
-        <label><input type="radio" name="ctype" value="audio"> 🎵 Audio</label>
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()" role="dialog" aria-modal="true" aria-label="Image preview">
+        <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close preview">✕</button>
+        <img id="lightbox-img" src="" alt="Media preview">
     </div>
 
-    <!-- YouTube quality selector -->
-    <div class="yt-quality-row" id="yt-quality-row">
-        <button class="yt-q-btn active" data-q="best"  onclick="setYtQuality(this)">🏆 Best</button>
-        <button class="yt-q-btn"        data-q="1080p" onclick="setYtQuality(this)">🎥 1080p</button>
-        <button class="yt-q-btn"        data-q="720p"  onclick="setYtQuality(this)">📹 720p</button>
-        <button class="yt-q-btn"        data-q="480p"  onclick="setYtQuality(this)">📺 480p</button>
-        <button class="yt-q-btn"        data-q="360p"  onclick="setYtQuality(this)">📱 360p</button>
-        <button class="yt-q-btn"        data-q="audio" onclick="setYtQuality(this)">🎵 Audio MP3</button>
-    </div>
-
-    <!-- Twitter/X quality selector -->
-    <div class="yt-quality-row" id="tw-quality-row">
-        <button class="yt-q-btn tw-active" data-q="best"  onclick="setTwQuality(this)">🏆 Best</button>
-        <button class="yt-q-btn"           data-q="720p"  onclick="setTwQuality(this)">📹 720p</button>
-        <button class="yt-q-btn"           data-q="480p"  onclick="setTwQuality(this)">📺 480p</button>
-        <button class="yt-q-btn"           data-q="360p"  onclick="setTwQuality(this)">📱 360p</button>
-        <button class="yt-q-btn"           data-q="audio" onclick="setTwQuality(this)">🎵 Audio</button>
-    </div>
-
-    <!-- Facebook quality selector -->
-    <div class="yt-quality-row" id="fb-quality-row">
-        <button class="yt-q-btn fb-active" data-q="best"  onclick="setFbQuality(this)">🏆 Best</button>
-        <button class="yt-q-btn"           data-q="720p"  onclick="setFbQuality(this)">📹 HD 720p</button>
-        <button class="yt-q-btn"           data-q="480p"  onclick="setFbQuality(this)">📺 SD 480p</button>
-        <button class="yt-q-btn"           data-q="360p"  onclick="setFbQuality(this)">📱 360p</button>
-        <button class="yt-q-btn"           data-q="audio" onclick="setFbQuality(this)">🎵 Audio</button>
-    </div>
-
-    <!-- TikTok quality selector -->
-    <div class="yt-quality-row" id="tk-quality-row">
-        <button class="yt-q-btn tk-active" data-q="best"  onclick="setTkQuality(this)">🏆 Best</button>
-        <button class="yt-q-btn"           data-q="720p"  onclick="setTkQuality(this)">📹 720p</button>
-        <button class="yt-q-btn"           data-q="480p"  onclick="setTkQuality(this)">📺 480p</button>
-        <button class="yt-q-btn"           data-q="360p"  onclick="setTkQuality(this)">📱 360p</button>
-        <button class="yt-q-btn"           data-q="audio" onclick="setTkQuality(this)">🎵 Audio</button>
-    </div>
-
-    <div class="media-card">
-        <div class="thumb-wrap">
-            <img id="s-thumb" src="" alt="" style="display:none;">
-            <div class="vc" id="s-vc" style="display:none;">
-                <button title="Watch on platform" onclick="openPlay()">▶</button>
-                <button title="Expand thumbnail"  onclick="openLightbox()">⛶</button>
+    <header class="hero-header">
+        <!-- Search -->
+        <div class="search-wrap">
+            <h1>📥 Free Video Downloader</h1>
+            <p class="search-subtitle">Download videos and photos from Instagram, YouTube, Twitter/X, TikTok, Facebook, Pinterest, and more with one clean workflow.</p>
+            <div class="brand-pills">
+                <span class="brand-pill pill-ig">📸 Instagram</span>
+                <span class="brand-pill pill-yt">▶️ YouTube</span>
+                <span class="brand-pill pill-tw">𝕏 Twitter/X</span>
+                <span class="brand-pill pill-pi">📌 Pinterest</span>
+                <span class="brand-pill pill-fb">📘 Facebook</span>
+            </div>
+            <div class="search-row">
+                <div class="input-wrap">
+                    <label class="sr-only" for="ig-url">Video URL</label>
+                    <input type="url" id="ig-url" placeholder="Paste any video URL — Instagram, YouTube, TikTok, Twitter/X, Facebook, Pinterest, Vimeo…" autocomplete="off" aria-label="Video URL input">
+                    <!-- Paste button: shown when input is empty -->
+                    <button type="button" class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
+                    <!-- Clear button: shown when input has text -->
+                    <button type="button" class="input-action-btn" id="clear-btn" title="Clear" onclick="clearInput()">✕</button>
+                </div>
+                <button type="button" id="search-btn" onclick="handleSearch()">
+                    <span id="search-text">Search</span>
+                    <span class="spin" id="search-spin"></span>
+                </button>
+            </div>
+            <div class="settings-row">
+                <div class="max-posts-row">
+                    <label for="max-posts-select">Posts / videos:</label>
+                    <select id="max-posts-select">
+                        <option value="12">12</option>
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="500">All (max 500)</option>
+                    </select>
+                </div>
+                <button type="button" class="settings-btn" onclick="toggleSettings()" aria-controls="settings-panel" aria-expanded="false">
+                    <span class="cookie-badge" id="cookie-badge"></span>
+                    ⚙️ Instagram Login
+                </button>
             </div>
         </div>
-        <div class="dl-btn-wrap">
-            <button id="s-dl-btn" onclick="singleDownload()">
-                <span id="s-dl-text">Download</span>
-                <span class="spin" id="s-dl-spin"></span>
-            </button>
-        </div>
-    </div>
 
-    <div class="copy-row caption">
-        <div id="s-caption" style="flex:1;"></div>
-        <button class="copy-btn" id="s-caption-copy" onclick="copyText(document.getElementById('s-caption').textContent,this)" title="Copy description">⎘ Copy</button>
-    </div>
-
-    <div class="ready-card" id="ready-card" style="display:none;">
-        <div class="rc-thumb"><img id="rc-thumb" src="" alt="" style="display:none;"></div>
-        <div class="rc-body">
-            <h3>✅ Downloaded!</h3>
-            <div class="copy-row" id="rc-title-row" style="display:none;">
-                <div class="rc-title" id="rc-title"></div>
-                <button class="copy-btn" onclick="copyText(document.getElementById('rc-title').textContent,this)" title="Copy title">⎘ Copy</button>
+        <!-- Settings / Cookie Panel -->
+        <div class="settings-panel" id="settings-panel">
+            <h3>🍪 Instagram Session Cookie</h3>
+            <p class="hint">Required only for Instagram profiles (not for YouTube). Add your <strong>sessionid</strong> to fetch more than 12 posts.</p>
+            <div class="field-row">
+                <label for="f-sessionid">sessionid <span style="color:#e74c3c">*</span></label>
+                <input type="password" id="f-sessionid" placeholder="Paste your sessionid cookie value…">
             </div>
-            <div class="copy-row" id="rc-caption-row" style="display:none;">
-                <div class="rc-caption" id="rc-caption"></div>
-                <button class="copy-btn" onclick="copyText(document.getElementById('rc-caption').textContent,this)" title="Copy description">⎘ Copy</button>
+            <div class="field-row">
+                <label for="f-csrftoken">csrftoken <span style="color:#999">(optional)</span></label>
+                <input type="text" id="f-csrftoken" placeholder="Paste your csrftoken…">
             </div>
-            <hr class="rc-divider" id="rc-divider" style="display:none;">
-            <div class="rc-meta" id="rc-filename"></div>
-            <div class="rc-meta" id="rc-filesize"></div>
-            <a id="rc-link" href="#" download>↓ Download again</a>
+            <div class="field-row">
+                <label for="f-ds_user_id">ds_user_id <span style="color:#999">(optional)</span></label>
+                <input type="text" id="f-ds_user_id" placeholder="Paste your ds_user_id…">
+            </div>
+            <div class="settings-actions">
+                <button class="save-cookie-btn" onclick="saveCookie()">💾 Save</button>
+                <button class="clear-cookie-btn" onclick="clearCookie()">🗑 Clear</button>
+                <span class="cookie-status-msg" id="cookie-save-msg">✅ Saved!</span>
+            </div>
+            <div class="how-to">
+                <strong>📖 How to get your Instagram session cookie (Chrome / Edge)</strong>
+                <ol>
+                    <li>Open <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer">instagram.com</a> and log in.</li>
+                    <li>Press <kbd>F12</kbd> → <strong>Application</strong> tab → <strong>Cookies → https://www.instagram.com</strong>.</li>
+                    <li>Copy the <strong>sessionid</strong> value and paste above.</li>
+                </ol>
+            </div>
+        </div><!-- /settings-panel -->
+    </header>
+
+    <main id="main-content">
+        <div id="msg" role="status" aria-live="polite"></div>
+
+
+        <!-- ── Single result (Instagram post OR YouTube video) ── -->
+        <section id="single-result" aria-labelledby="s-title">
+            <div class="result-title-row">
+                <h2 id="s-title" style="margin-bottom:0;">Search result</h2>
+                <button class="copy-btn" id="s-title-copy" onclick="copyText(document.getElementById('s-title').textContent,this)" title="Copy title">⎘ Copy</button>
+            </div>
+            <p class="s-meta" id="s-meta"></p>
+
+            <!-- Instagram options -->
+            <div class="options-row" id="ig-options">
+                <label><input type="radio" name="ctype" value="both" checked> 📹🔊 Both</label>
+                <label><input type="radio" name="ctype" value="video"> 📹 Video</label>
+                <label><input type="radio" name="ctype" value="audio"> 🎵 Audio</label>
+            </div>
+
+            <!-- YouTube quality selector -->
+            <div class="yt-quality-row" id="yt-quality-row">
+                <button class="yt-q-btn active" data-q="best"  onclick="setYtQuality(this)">🏆 Best</button>
+                <button class="yt-q-btn"        data-q="1080p" onclick="setYtQuality(this)">🎥 1080p</button>
+                <button class="yt-q-btn"        data-q="720p"  onclick="setYtQuality(this)">📹 720p</button>
+                <button class="yt-q-btn"        data-q="480p"  onclick="setYtQuality(this)">📺 480p</button>
+                <button class="yt-q-btn"        data-q="360p"  onclick="setYtQuality(this)">📱 360p</button>
+                <button class="yt-q-btn"        data-q="audio" onclick="setYtQuality(this)">🎵 Audio MP3</button>
+            </div>
+
+            <!-- Twitter/X quality selector -->
+            <div class="yt-quality-row" id="tw-quality-row">
+                <button class="yt-q-btn tw-active" data-q="best"  onclick="setTwQuality(this)">🏆 Best</button>
+                <button class="yt-q-btn"           data-q="720p"  onclick="setTwQuality(this)">📹 720p</button>
+                <button class="yt-q-btn"           data-q="480p"  onclick="setTwQuality(this)">📺 480p</button>
+                <button class="yt-q-btn"           data-q="360p"  onclick="setTwQuality(this)">📱 360p</button>
+                <button class="yt-q-btn"           data-q="audio" onclick="setTwQuality(this)">🎵 Audio</button>
+            </div>
+
+            <!-- Facebook quality selector -->
+            <div class="yt-quality-row" id="fb-quality-row">
+                <button class="yt-q-btn fb-active" data-q="best"  onclick="setFbQuality(this)">🏆 Best</button>
+                <button class="yt-q-btn"           data-q="720p"  onclick="setFbQuality(this)">📹 HD 720p</button>
+                <button class="yt-q-btn"           data-q="480p"  onclick="setFbQuality(this)">📺 SD 480p</button>
+                <button class="yt-q-btn"           data-q="360p"  onclick="setFbQuality(this)">📱 360p</button>
+                <button class="yt-q-btn"           data-q="audio" onclick="setFbQuality(this)">🎵 Audio</button>
+            </div>
+
+            <!-- TikTok quality selector -->
+            <div class="yt-quality-row" id="tk-quality-row">
+                <button class="yt-q-btn tk-active" data-q="best"  onclick="setTkQuality(this)">🏆 Best</button>
+                <button class="yt-q-btn"           data-q="720p"  onclick="setTkQuality(this)">📹 720p</button>
+                <button class="yt-q-btn"           data-q="480p"  onclick="setTkQuality(this)">📺 480p</button>
+                <button class="yt-q-btn"           data-q="360p"  onclick="setTkQuality(this)">📱 360p</button>
+                <button class="yt-q-btn"           data-q="audio" onclick="setTkQuality(this)">🎵 Audio</button>
+            </div>
+
+            <div class="media-card">
+                <div class="thumb-wrap">
+                    <img id="s-thumb" src="" alt="" style="display:none;">
+                    <div class="vc" id="s-vc" style="display:none;">
+                        <button title="Watch on platform" onclick="openPlay()">▶</button>
+                        <button title="Expand thumbnail"  onclick="openLightbox()">⛶</button>
+                    </div>
+                </div>
+                <div class="dl-btn-wrap">
+                    <button id="s-dl-btn" onclick="singleDownload()">
+                        <span id="s-dl-text">Download</span>
+                        <span class="spin" id="s-dl-spin"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="copy-row caption">
+                <div id="s-caption" style="flex:1;"></div>
+                <button class="copy-btn" id="s-caption-copy" onclick="copyText(document.getElementById('s-caption').textContent,this)" title="Copy description">⎘ Copy</button>
+            </div>
+
+            <div class="ready-card" id="ready-card" style="display:none;">
+                <div class="rc-thumb"><img id="rc-thumb" src="" alt="" style="display:none;"></div>
+                <div class="rc-body">
+                    <h3>✅ Downloaded!</h3>
+                    <div class="copy-row" id="rc-title-row" style="display:none;">
+                        <div class="rc-title" id="rc-title"></div>
+                        <button class="copy-btn" onclick="copyText(document.getElementById('rc-title').textContent,this)" title="Copy title">⎘ Copy</button>
+                    </div>
+                    <div class="copy-row" id="rc-caption-row" style="display:none;">
+                        <div class="rc-caption" id="rc-caption"></div>
+                        <button class="copy-btn" onclick="copyText(document.getElementById('rc-caption').textContent,this)" title="Copy description">⎘ Copy</button>
+                    </div>
+                    <hr class="rc-divider" id="rc-divider" style="display:none;">
+                    <div class="rc-meta" id="rc-filename"></div>
+                    <div class="rc-meta" id="rc-filesize"></div>
+                    <a id="rc-link" href="#" download>↓ Download again</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Profile / Playlist grid ── -->
+        <section id="profile-result" aria-labelledby="pr-title">
+            <h2 id="pr-title">@username</h2>
+            <p class="sub" id="pr-sub"></p>
+
+            <div class="dl-all-bar" id="dl-all-bar">
+                <button class="dl-all-btn" id="dl-all-btn" onclick="downloadAll()">
+                    <span class="dl-all-spin" id="dl-all-spin"></span>
+                    📥 Download All
+                </button>
+                <button class="stop-all-btn" id="stop-all-btn" onclick="stopAll()" style="display:none;">⏹ Stop</button>
+                <!-- YouTube grid quality picker -->
+                <div class="yt-grid-quality" id="yt-grid-quality">
+                    <label for="yt-grid-q-select">Quality:</label>
+                    <select id="yt-grid-q-select">
+                        <option value="best">🏆 Best</option>
+                        <option value="1080p">🎥 1080p</option>
+                        <option value="720p" selected>📹 720p</option>
+                        <option value="480p">📺 480p</option>
+                        <option value="360p">📱 360p</option>
+                        <option value="audio">🎵 Audio MP3</option>
+                    </select>
+                </div>
+                <div class="dl-progress-wrap" id="dl-progress-wrap" style="visibility:hidden;">
+                    <div class="dl-progress-bar"><div class="dl-progress-fill" id="dl-progress-fill"></div></div>
+                    <span class="dl-progress-text" id="dl-progress-text">0 / 0</span>
+                </div>
+            </div>
+
+            <div class="posts-grid" id="posts-grid"></div>
+        </section>
+
+
+        <!-- History -->
+        <div class="history-section" role="complementary" aria-label="Recent downloads">
+            <h3>Recent Downloads</h3>
+            <div id="history-list"><p class="empty-history">No downloads yet</p></div>
         </div>
-    </div>
-</section>
 
-<!-- ── Profile / Playlist grid ── -->
-<section id="profile-result" aria-labelledby="pr-title">
-    <h2 id="pr-title">@username</h2>
-    <p class="sub" id="pr-sub"></p>
+    </main>
 
-    <div class="dl-all-bar" id="dl-all-bar">
-        <button class="dl-all-btn" id="dl-all-btn" onclick="downloadAll()">
-            <span class="dl-all-spin" id="dl-all-spin"></span>
-            📥 Download All
-        </button>
-        <button class="stop-all-btn" id="stop-all-btn" onclick="stopAll()" style="display:none;">⏹ Stop</button>
-        <!-- YouTube grid quality picker -->
-        <div class="yt-grid-quality" id="yt-grid-quality">
-            <label for="yt-grid-q-select">Quality:</label>
-            <select id="yt-grid-q-select">
-                <option value="best">🏆 Best</option>
-                <option value="1080p">🎥 1080p</option>
-                <option value="720p" selected>📹 720p</option>
-                <option value="480p">📺 480p</option>
-                <option value="360p">📱 360p</option>
-                <option value="audio">🎵 Audio MP3</option>
-            </select>
-        </div>
-        <div class="dl-progress-wrap" id="dl-progress-wrap" style="visibility:hidden;">
-            <div class="dl-progress-bar"><div class="dl-progress-fill" id="dl-progress-fill"></div></div>
-            <span class="dl-progress-text" id="dl-progress-text">0 / 0</span>
-        </div>
-    </div>
-
-    <div class="posts-grid" id="posts-grid"></div>
-</section>
-
-
-<!-- History -->
-<div class="history-section" role="complementary" aria-label="Recent downloads">
-    <h3>Recent Downloads</h3>
-    <div id="history-list"><p class="empty-history">No downloads yet</p></div>
-</div>
-
-</main>
-
-<!-- SEO Footer -->
-<footer class="site-footer">
-    <h2 class="footer-heading">Free Online Video Downloader for Instagram, YouTube, TikTok, Twitter/X, Facebook, and Pinterest</h2>
-    <p class="footer-copy">
-        <strong>QuickSaveVideos</strong> is a fast and mobile-friendly video downloader that helps you save reels, shorts, clips, and photos in high quality.
-        Use one link box to get download options for MP4 video and audio formats without account signup.
-    </p>
-    <nav class="footer-links" aria-label="Supported platform downloaders">
-        <a href="/" aria-label="Instagram video downloader">Instagram downloader</a>
-        <a href="/" aria-label="YouTube video downloader">YouTube downloader</a>
-        <a href="/" aria-label="TikTok video downloader">TikTok downloader</a>
-        <a href="/" aria-label="Twitter X video downloader">Twitter/X downloader</a>
-        <a href="/" aria-label="Facebook video downloader">Facebook downloader</a>
-        <a href="/" aria-label="Pinterest video downloader">Pinterest downloader</a>
-    </nav>
-    <p class="footer-copy">
-        Whether you need an Instagram Reels downloader, a YouTube shorts downloader, a TikTok video saver, or a Twitter video downloader,
-        this tool is designed for simple steps: paste URL, choose quality, and download.
-        HD resolutions and audio extraction support are available where the source platform provides those streams.
-    </p>
-    <p class="footer-copy">
-        This online downloader works well on desktop and mobile browsers and is built for quick, reliable media fetch with clear format options.
-        For best results, use public links and always respect creator rights, local laws, and each platform's terms.
-    </p>
-    <p class="footer-note">
-        ⚠️ Only download content you own or have permission to download. Respect copyright and platform terms of service.
-    </p>
-    <nav class="footer-links" aria-label="Company pages">
-        <a href="{{ url_for('about') }}">About</a>
-        <a href="{{ url_for('contact') }}">Contact</a>
-        <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>
-        <a href="{{ url_for('terms') }}">Terms</a>
-    </nav>
-</footer>
+    <!-- SEO Footer -->
+    <footer class="site-footer">
+        <h2 class="footer-heading">Free Online Video Downloader for Instagram, YouTube, TikTok, Twitter/X, Facebook, and Pinterest</h2>
+        <p class="footer-copy">
+            <strong>QuickSaveVideos</strong> is a fast and mobile-friendly video downloader that helps you save reels, shorts, clips, and photos in high quality.
+            Use one link box to get download options for MP4 video and audio formats without account signup.
+        </p>
+        <nav class="footer-links" aria-label="Supported platform downloaders">
+            <a href="/" aria-label="Instagram video downloader">Instagram downloader</a>
+            <a href="/" aria-label="YouTube video downloader">YouTube downloader</a>
+            <a href="/" aria-label="TikTok video downloader">TikTok downloader</a>
+            <a href="/" aria-label="Twitter X video downloader">Twitter/X downloader</a>
+            <a href="/" aria-label="Facebook video downloader">Facebook downloader</a>
+            <a href="/" aria-label="Pinterest video downloader">Pinterest downloader</a>
+        </nav>
+        <p class="footer-copy">
+            Whether you need an Instagram Reels downloader, a YouTube shorts downloader, a TikTok video saver, or a Twitter video downloader,
+            this tool is designed for simple steps: paste URL, choose quality, and download.
+            HD resolutions and audio extraction support are available where the source platform provides those streams.
+        </p>
+        <p class="footer-copy">
+            This online downloader works well on desktop and mobile browsers and is built for quick, reliable media fetch with clear format options.
+            For best results, use public links and always respect creator rights, local laws, and each platform's terms.
+        </p>
+        <p class="footer-note">
+            ⚠️ Only download content you own or have permission to download. Respect copyright and platform terms of service.
+        </p>
+        <nav class="footer-links" aria-label="Company pages">
+            <a href="{{ url_for('about') }}">About</a>
+            <a href="{{ url_for('contact') }}">Contact</a>
+            <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>
+            <a href="{{ url_for('terms') }}">Terms</a>
+        </nav>
+    </footer>
 
 </div>
 
 <script>
-let currentUrl      = '';
-let currentPlatform = 'instagram';   // 'instagram'|'youtube'|'twitter'|'pinterest'|'facebook'|'tiktok'|'generic'
-let ytQuality = 'best';
-let twQuality = 'best';
-let fbQuality = 'best';
-let tkQuality = 'best';
-let previewData     = null;
-let dlHistory = JSON.parse(localStorage.getItem('igDlHistory') || '[]').slice(0, 5);
-renderHistory();
+    let currentUrl      = '';
+    let currentPlatform = 'instagram';   // 'instagram'|'youtube'|'twitter'|'pinterest'|'facebook'|'tiktok'|'generic'
+    let ytQuality = 'best';
+    let twQuality = 'best';
+    let fbQuality = 'best';
+    let tkQuality = 'best';
+    let previewData     = null;
+    let dlHistory = JSON.parse(localStorage.getItem('igDlHistory') || '[]').slice(0, 5);
+    renderHistory();
 
-/* ─── COOKIE STATUS ──────────────────────────────────────────────────── */
-async function checkCookieStatus() {
-    try {
-        const r = await fetch('/api/cookie-status');
-        const d = await r.json();
-        const badge = document.getElementById('cookie-badge');
-        if (d.has_cookies) { badge.classList.add('ok'); badge.title = 'IG cookie set'; }
-        else               { badge.classList.remove('ok'); badge.title = 'No IG cookie'; }
-    } catch(e) {}
-}
-checkCookieStatus();
-
-function toggleSettings() {
-    const p = document.getElementById('settings-panel');
-    const btn = document.querySelector('.settings-btn[aria-controls="settings-panel"]');
-    const willShow = p.style.display !== 'block';
-    p.style.display = willShow ? 'block' : 'none';
-    if (btn) btn.setAttribute('aria-expanded', String(willShow));
-}
-async function saveCookie() {
-    const sessionid = document.getElementById('f-sessionid').value.trim();
-    if (!sessionid) { alert('sessionid is required'); return; }
-    const r = await fetch('/api/set-cookie', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ sessionid, csrftoken: document.getElementById('f-csrftoken').value.trim(), ds_user_id: document.getElementById('f-ds_user_id').value.trim() }),
-    });
-    const d = await r.json();
-    if (d.success) { const m=document.getElementById('cookie-save-msg'); m.style.display='inline'; setTimeout(()=>m.style.display='none',3000); checkCookieStatus(); }
-    else alert('Error: '+d.error);
-}
-async function clearCookie() {
-    if (!confirm('Clear saved Instagram cookies?')) return;
-    await fetch('/api/set-cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionid:'_cleared_'})}).catch(()=>{});
-    ['f-sessionid','f-csrftoken','f-ds_user_id'].forEach(id=>document.getElementById(id).value='');
+    /* ─── COOKIE STATUS ──────────────────────────────────────────────────── */
+    async function checkCookieStatus() {
+        try {
+            const r = await fetch('/api/cookie-status');
+            const d = await r.json();
+            const badge = document.getElementById('cookie-badge');
+            if (d.has_cookies) { badge.classList.add('ok'); badge.title = 'IG cookie set'; }
+            else               { badge.classList.remove('ok'); badge.title = 'No IG cookie'; }
+        } catch(e) {}
+    }
     checkCookieStatus();
-}
 
-/* ─── YouTube quality ────────────────────────────────────────────────── */
-function setYtQuality(btn) {
-    document.querySelectorAll('#yt-quality-row .yt-q-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    ytQuality = btn.dataset.q;
-}
-
-/* ─── Twitter/X quality ──────────────────────────────────────────────── */
-function setTwQuality(btn) {
-    document.querySelectorAll('#tw-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','tw-active'));
-    btn.classList.add('tw-active');
-    twQuality = btn.dataset.q;
-}
-
-/* ─── Facebook quality ───────────────────────────────────────────────── */
-function setFbQuality(btn) {
-    document.querySelectorAll('#fb-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','fb-active'));
-    btn.classList.add('fb-active');
-    fbQuality = btn.dataset.q;
-}
-
-/* ─── TikTok quality ─────────────────────────────────────────────────── */
-function setTkQuality(btn) {
-    document.querySelectorAll('#tk-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','tk-active'));
-    btn.classList.add('tk-active');
-    tkQuality = btn.dataset.q;
-}
-
-/* ─── SEARCH ─────────────────────────────────────────────────────────── */
-async function handleSearch() {
-    const url = document.getElementById('ig-url').value.trim();
-    if (!url) return showMsg('Please enter a URL', 'error');
-    if (!url.startsWith('http://') && !url.startsWith('https://'))
-        return showMsg('Please enter a valid URL starting with http:// or https://', 'error');
-
-    currentUrl = url;
-    setBusy('search', true);
-    hideMsg();
-    hide('single-result');
-    hide('profile-result');
-    document.getElementById('ready-card').style.display = 'none';
-
-    try {
-        const dr   = await post('/api/detect', { url });
-        const type = dr.url_type;
-
-        if (type === 'tiktok_video') {
-            currentPlatform = 'tiktok';
-            await loadSinglePost(url, 'tiktok');
-        } else if (type === 'tiktok_profile') {
-            showMsg('⚠️ TikTok profile pages are not supported. Please paste a direct video link — it should contain "/video/" in the URL.', 'error');
-        } else if (type === 'facebook_video') {
-            currentPlatform = 'facebook';
-            await loadSinglePost(url, 'facebook');
-        } else if (type === 'facebook_profile') {
-            showMsg('⚠️ Facebook profile/page links are not supported. Please paste a direct video link containing "/videos/", "/watch", "/reel/", or use fb.watch', 'error');
-        } else if (type === 'pinterest_post') {
-            currentPlatform = 'pinterest';
-            await loadSinglePost(url, 'pinterest');
-        } else if (type === 'pinterest_profile') {
-            showMsg('⚠️ Pinterest profile/board pages are not supported. Please paste a direct pin link — it should contain "/pin/" in the URL.', 'error');
-        } else if (type === 'twitter_profile') {
-            showMsg('⚠️ Twitter/X profile pages are not supported. Please paste a direct tweet link — it should contain "/status/" in the URL.', 'error');
-        } else if (type === 'twitter_video') {
-            currentPlatform = 'twitter';
-            await loadSinglePost(url, 'twitter');
-        } else if (type === 'yt_video') {
-            currentPlatform = 'youtube';
-            await loadSinglePost(url, 'youtube');
-        } else if (type === 'yt_playlist' || type === 'yt_channel') {
-            currentPlatform = 'youtube';
-            await loadYouTubePlaylist(url);
-        } else if (type === 'profile') {
-            currentPlatform = 'instagram';
-            await loadProfile(url);
-        } else if (type === 'post' || type === 'reel') {
-            currentPlatform = 'instagram';
-            await loadSinglePost(url, 'instagram');
-        } else if (type === 'generic') {
-            // generic_video — any URL yt-dlp might support (Vimeo, Twitch, Reddit, etc.)
-            currentPlatform = 'generic';
-            await loadSinglePost(url, 'generic');
-        } else {
-            showMsg('⚠️ Unknown URL type. Please paste a valid link from a supported website.', 'error');
-        }
-    } catch(e) {
-        showMsg('Error: ' + e.message, 'error');
-    } finally {
-        setBusy('search', false);
+    function toggleSettings() {
+        const p = document.getElementById('settings-panel');
+        const btn = document.querySelector('.settings-btn[aria-controls="settings-panel"]');
+        const willShow = p.style.display !== 'block';
+        p.style.display = willShow ? 'block' : 'none';
+        if (btn) btn.setAttribute('aria-expanded', String(willShow));
     }
-}
+    async function saveCookie() {
+        const sessionid = document.getElementById('f-sessionid').value.trim();
+        if (!sessionid) { alert('sessionid is required'); return; }
+        const r = await fetch('/api/set-cookie', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ sessionid, csrftoken: document.getElementById('f-csrftoken').value.trim(), ds_user_id: document.getElementById('f-ds_user_id').value.trim() }),
+        });
+        const d = await r.json();
+        if (d.success) { const m=document.getElementById('cookie-save-msg'); m.style.display='inline'; setTimeout(()=>m.style.display='none',3000); checkCookieStatus(); }
+        else alert('Error: '+d.error);
+    }
+    async function clearCookie() {
+        if (!confirm('Clear saved Instagram cookies?')) return;
+        await fetch('/api/set-cookie',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionid:'_cleared_'})}).catch(()=>{});
+        ['f-sessionid','f-csrftoken','f-ds_user_id'].forEach(id=>document.getElementById(id).value='');
+        checkCookieStatus();
+    }
 
-/* ─── YOUTUBE PLAYLIST / CHANNEL ─────────────────────────────────────── */
-async function loadYouTubePlaylist(url) {
-    const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
-    showMsg(`Fetching YouTube playlist / channel…`, 'info');
-    try {
-        const data = await post('/api/youtube/playlist', { url, max_posts });
-        if (!data.success) { showMsg(data.error || 'Could not load playlist', 'error'); return; }
+    /* ─── YouTube quality ────────────────────────────────────────────────── */
+    function setYtQuality(btn) {
+        document.querySelectorAll('#yt-quality-row .yt-q-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        ytQuality = btn.dataset.q;
+    }
 
+    /* ─── Twitter/X quality ──────────────────────────────────────────────── */
+    function setTwQuality(btn) {
+        document.querySelectorAll('#tw-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','tw-active'));
+        btn.classList.add('tw-active');
+        twQuality = btn.dataset.q;
+    }
+
+    /* ─── Facebook quality ───────────────────────────────────────────────── */
+    function setFbQuality(btn) {
+        document.querySelectorAll('#fb-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','fb-active'));
+        btn.classList.add('fb-active');
+        fbQuality = btn.dataset.q;
+    }
+
+    /* ─── TikTok quality ─────────────────────────────────────────────────── */
+    function setTkQuality(btn) {
+        document.querySelectorAll('#tk-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','tk-active'));
+        btn.classList.add('tk-active');
+        tkQuality = btn.dataset.q;
+    }
+
+    /* ─── SEARCH ─────────────────────────────────────────────────────────── */
+    async function handleSearch() {
+        const url = document.getElementById('ig-url').value.trim();
+        if (!url) return showMsg('Please enter a URL', 'error');
+        if (!url.startsWith('http://') && !url.startsWith('https://'))
+            return showMsg('Please enter a valid URL starting with http:// or https://', 'error');
+
+        currentUrl = url;
+        setBusy('search', true);
         hideMsg();
-        window._postsMap = {};
-        data.videos.forEach(v => { window._postsMap[v.id] = v; });
+        hide('single-result');
+        hide('profile-result');
+        document.getElementById('ready-card').style.display = 'none';
 
-        document.getElementById('pr-title').textContent = data.title || 'YouTube Playlist';
-        document.getElementById('pr-sub').textContent   =
-            `${data.count} videos${data.uploader ? ' · ' + data.uploader : ''}`;
+        try {
+            const dr   = await post('/api/detect', { url });
+            const type = dr.url_type;
 
-        // Show YouTube quality picker and colour the Download All button red
-        document.getElementById('yt-grid-quality').classList.add('show');
-        document.getElementById('dl-all-btn').classList.add('yt-dl-btn');
-
-        document.getElementById('posts-grid').innerHTML = data.videos.map(v => postCardHTML(v)).join('');
-        show('profile-result');
-    } catch(e) {
-        showMsg('Playlist load failed: ' + e.message, 'error');
-    }
-}
-
-/* ─── INSTAGRAM PROFILE ───────────────────────────────────────────────── */
-async function loadProfile(url) {
-    const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
-    showMsg(`Fetching up to ${max_posts} Instagram posts…`, 'info');
-    try {
-        const data = await post('/api/profile', { url, max_posts });
-        if (!data.success) {
-            let errHtml = esc(data.error || 'Could not load profile');
-            if (data.needs_cookie)
-                errHtml += ' <button onclick="toggleSettings();document.getElementById(\'settings-panel\').scrollIntoView({behavior:\'smooth\'})" style="margin-left:8px;padding:4px 12px;font-size:12px;background:#3d82f7;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚙️ Login</button>';
-            showMsgHtml(errHtml, 'error');
-            return;
+            if (type === 'tiktok_video') {
+                currentPlatform = 'tiktok';
+                await loadSinglePost(url, 'tiktok');
+            } else if (type === 'tiktok_profile') {
+                showMsg('⚠️ TikTok profile pages are not supported. Please paste a direct video link — it should contain "/video/" in the URL.', 'error');
+            } else if (type === 'facebook_video') {
+                currentPlatform = 'facebook';
+                await loadSinglePost(url, 'facebook');
+            } else if (type === 'facebook_profile') {
+                showMsg('⚠️ Facebook profile/page links are not supported. Please paste a direct video link containing "/videos/", "/watch", "/reel/", or use fb.watch', 'error');
+            } else if (type === 'pinterest_post') {
+                currentPlatform = 'pinterest';
+                await loadSinglePost(url, 'pinterest');
+            } else if (type === 'pinterest_profile') {
+                showMsg('⚠️ Pinterest profile/board pages are not supported. Please paste a direct pin link — it should contain "/pin/" in the URL.', 'error');
+            } else if (type === 'twitter_profile') {
+                showMsg('⚠️ Twitter/X profile pages are not supported. Please paste a direct tweet link — it should contain "/status/" in the URL.', 'error');
+            } else if (type === 'twitter_video') {
+                currentPlatform = 'twitter';
+                await loadSinglePost(url, 'twitter');
+            } else if (type === 'yt_video') {
+                currentPlatform = 'youtube';
+                await loadSinglePost(url, 'youtube');
+            } else if (type === 'yt_playlist' || type === 'yt_channel') {
+                currentPlatform = 'youtube';
+                await loadYouTubePlaylist(url);
+            } else if (type === 'profile') {
+                currentPlatform = 'instagram';
+                await loadProfile(url);
+            } else if (type === 'post' || type === 'reel') {
+                currentPlatform = 'instagram';
+                await loadSinglePost(url, 'instagram');
+            } else if (type === 'generic') {
+                // generic_video — any URL yt-dlp might support (Vimeo, Twitch, Reddit, etc.)
+                currentPlatform = 'generic';
+                await loadSinglePost(url, 'generic');
+            } else {
+                showMsg('⚠️ Unknown URL type. Please paste a valid link from a supported website.', 'error');
+            }
+        } catch(e) {
+            showMsg('Error: ' + e.message, 'error');
+        } finally {
+            setBusy('search', false);
         }
-        hideMsg();
-        window._postsMap = {};
-        data.posts.forEach(p => { window._postsMap[p.id] = p; });
-
-        document.getElementById('pr-title').textContent = '@' + data.username;
-        let subText = `${data.count} posts loaded`;
-        if (data.count <= 12 && data.count < max_posts)
-            subText += ' — add a session cookie in ⚙️ Login to fetch more';
-        else if (data.count < max_posts)
-            subText += ' (reached end of profile)';
-        document.getElementById('pr-sub').textContent = subText;
-
-        // Reset YouTube styling
-        document.getElementById('yt-grid-quality').classList.remove('show');
-        document.getElementById('dl-all-btn').classList.remove('yt-dl-btn');
-
-        document.getElementById('posts-grid').innerHTML = data.posts.map(p => postCardHTML(p)).join('');
-        show('profile-result');
-    } catch(e) {
-        showMsg('Profile load failed: ' + e.message, 'error');
     }
-}
 
-/* ─── POST CARD ───────────────────────────────────────────────────────── */
-function thumbUrl(raw) {
-    if (!raw) return '';
-    // YouTube / Google CDN thumbnails are publicly accessible — load directly for speed
-    if (raw.includes('ytimg.com') || raw.includes('ggpht.com') || raw.includes('googleusercontent.com')) {
-        return raw;
+    /* ─── YOUTUBE PLAYLIST / CHANNEL ─────────────────────────────────────── */
+    async function loadYouTubePlaylist(url) {
+        const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
+        showMsg(`Fetching YouTube playlist / channel…`, 'info');
+        try {
+            const data = await post('/api/youtube/playlist', { url, max_posts });
+            if (!data.success) { showMsg(data.error || 'Could not load playlist', 'error'); return; }
+
+            hideMsg();
+            window._postsMap = {};
+            data.videos.forEach(v => { window._postsMap[v.id] = v; });
+
+            document.getElementById('pr-title').textContent = data.title || 'YouTube Playlist';
+            document.getElementById('pr-sub').textContent   =
+                `${data.count} videos${data.uploader ? ' · ' + data.uploader : ''}`;
+
+            // Show YouTube quality picker and colour the Download All button red
+            document.getElementById('yt-grid-quality').classList.add('show');
+            document.getElementById('dl-all-btn').classList.add('yt-dl-btn');
+
+            document.getElementById('posts-grid').innerHTML = data.videos.map(v => postCardHTML(v)).join('');
+            show('profile-result');
+        } catch(e) {
+            showMsg('Playlist load failed: ' + e.message, 'error');
+        }
     }
-    // Instagram / Facebook CDN requires backend proxy (Referer + CORS restrictions)
-    return '/api/thumbnail?url=' + encodeURIComponent(raw);
-}
 
-function postCardHTML(p) {
-    const isYt    = p.platform === 'youtube';
-    const isVid   = p.is_video || isYt;
-    const badge   = isYt ? '▶️ YouTube' : (isVid ? '📹 Video' : '📸 Photo');
-    const dur     = p.duration ? `<span class="pc-dur">${esc(p.duration)}</span>` : '';
-    const title   = p.title || '';
-    const desc    = p.description || '';
-    const safeId  = esc(p.id);
-    const proxyThumb = p.thumbnail ? thumbUrl(p.thumbnail) : '';
-    const cardCls = isYt ? 'yt-card' : 'ig-card';
+    /* ─── INSTAGRAM PROFILE ───────────────────────────────────────────────── */
+    async function loadProfile(url) {
+        const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
+        showMsg(`Fetching up to ${max_posts} Instagram posts…`, 'info');
+        try {
+            const data = await post('/api/profile', { url, max_posts });
+            if (!data.success) {
+                let errHtml = esc(data.error || 'Could not load profile');
+                if (data.needs_cookie)
+                    errHtml += ' <button onclick="toggleSettings();document.getElementById(\'settings-panel\').scrollIntoView({behavior:\'smooth\'})" style="margin-left:8px;padding:4px 12px;font-size:12px;background:#3d82f7;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚙️ Login</button>';
+                showMsgHtml(errHtml, 'error');
+                return;
+            }
+            hideMsg();
+            window._postsMap = {};
+            data.posts.forEach(p => { window._postsMap[p.id] = p; });
 
-    const imgHtml = proxyThumb
-        ? `<div class="thumb-loading" id="tl-${safeId}"></div>
-           <img src="${proxyThumb}" alt=""
-                onload="var e=document.getElementById('tl-${safeId}');if(e)e.style.display='none';"
-                onerror="
-                    var e=document.getElementById('tl-${safeId}');if(e)e.style.display='none';
-                    if(this.src.includes('maxresdefault')){
-                        this.src=this.src.replace('maxresdefault','hqdefault');
-                    } else {
-                        this.style.display='none';
-                        var n=document.getElementById('nt-${safeId}');if(n)n.style.display='flex';
-                    }">`
-        : '';
+            document.getElementById('pr-title').textContent = '@' + data.username;
+            let subText = `${data.count} posts loaded`;
+            if (data.count <= 12 && data.count < max_posts)
+                subText += ' — add a session cookie in ⚙️ Login to fetch more';
+            else if (data.count < max_posts)
+                subText += ' (reached end of profile)';
+            document.getElementById('pr-sub').textContent = subText;
 
-    const noThumb = `<div class="no-thumb" id="nt-${safeId}" style="display:${proxyThumb?'none':'flex'}">
-        ${isYt ? '▶️' : (isVid ? '🎬' : '📷')}<span>No preview</span>
-    </div>`;
+            // Reset YouTube styling
+            document.getElementById('yt-grid-quality').classList.remove('show');
+            document.getElementById('dl-all-btn').classList.remove('yt-dl-btn');
 
-    const playOverlay = `<div class="play-overlay">
-        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="40" cy="40" r="38" fill="rgba(0,0,0,.45)" stroke="rgba(255,255,255,.7)" stroke-width="2"/>
-            <polygon points="32,24 60,40 32,56" fill="white"/>
-        </svg>
-    </div>`;
+            document.getElementById('posts-grid').innerHTML = data.posts.map(p => postCardHTML(p)).join('');
+            show('profile-result');
+        } catch(e) {
+            showMsg('Profile load failed: ' + e.message, 'error');
+        }
+    }
 
-    const uploader = p.uploader ? `<div class="pc-uploader">📺 ${esc(p.uploader)}</div>` : '';
+    /* ─── POST CARD ───────────────────────────────────────────────────────── */
+    function thumbUrl(raw) {
+        if (!raw) return '';
+        // YouTube / Google CDN thumbnails are publicly accessible — load directly for speed
+        if (raw.includes('ytimg.com') || raw.includes('ggpht.com') || raw.includes('googleusercontent.com')) {
+            return raw;
+        }
+        // Instagram / Facebook CDN requires backend proxy (Referer + CORS restrictions)
+        return '/api/thumbnail?url=' + encodeURIComponent(raw);
+    }
 
-    // Show title bold + description below; fall back gracefully
-    const titleHtml = title
-        ? `<div class="copy-row"><div class="pc-title">${esc(title)}</div><button class="copy-btn" data-copy="${esc(title)}" onclick="copyText(this.dataset.copy,this)" title="Copy title">⎘ Copy</button></div>`
-        : '';
-    const descHtml = desc && desc !== title
-        ? `<div class="copy-row"><div class="pc-desc">${esc(desc)}</div><button class="copy-btn" data-copy="${esc(desc)}" onclick="copyText(this.dataset.copy,this)" title="Copy description">⎘ Copy</button></div>`
-        : (!title ? `<div class="pc-desc" style="color:#aaa;font-style:italic;">No description</div>` : '');
+    function postCardHTML(p) {
+        const isYt    = p.platform === 'youtube';
+        const isVid   = p.is_video || isYt;
+        const badge   = isYt ? '▶️ YouTube' : (isVid ? '📹 Video' : '📸 Photo');
+        const dur     = p.duration ? `<span class="pc-dur">${esc(p.duration)}</span>` : '';
+        const title   = p.title || '';
+        const desc    = p.description || '';
+        const safeId  = esc(p.id);
+        const proxyThumb = p.thumbnail ? thumbUrl(p.thumbnail) : '';
+        const cardCls = isYt ? 'yt-card' : 'ig-card';
 
-    return `
-    <div class="post-card ${cardCls}" id="card-${safeId}">
-        <div class="pc-thumb">
-            ${imgHtml}${noThumb}${playOverlay}
-            <span class="pc-badge">${badge}</span>${dur}
-        </div>
-        <div class="pc-body">
-            ${uploader}
-            ${titleHtml}${descHtml}
-            <button class="pc-dl-btn" id="btn-${safeId}" onclick="downloadPost('${safeId}')">
-                <span id="btn-txt-${safeId}">📥 Download</span>
-                <span class="spin" id="spin-${safeId}"></span>
-            </button>
-        </div>
-    </div>`;
-}
+        const imgHtml = proxyThumb
+            ? `<div class="thumb-loading" id="tl-${safeId}"></div>
+               <img src="${proxyThumb}" alt=""
+                    onload="var e=document.getElementById('tl-${safeId}');if(e)e.style.display='none';"
+                    onerror="
+                        var e=document.getElementById('tl-${safeId}');if(e)e.style.display='none';
+                        if(this.src.includes('maxresdefault')){
+                            this.src=this.src.replace('maxresdefault','hqdefault');
+                        } else {
+                            this.style.display='none';
+                            var n=document.getElementById('nt-${safeId}');if(n)n.style.display='flex';
+                        }">`
+            : '';
 
-/* ─── BROWSER SAVE DIALOG ────────────────────────────────────────────── */
-function triggerBrowserDownload(filename) {
-    const a = document.createElement('a');
-    a.href = '/api/file/' + encodeURIComponent(filename);
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
+        const noThumb = `<div class="no-thumb" id="nt-${safeId}" style="display:${proxyThumb?'none':'flex'}">
+            ${isYt ? '▶️' : (isVid ? '🎬' : '📷')}<span>No preview</span>
+        </div>`;
 
-/* ─── PER-CARD DOWNLOAD ──────────────────────────────────────────────── */
-async function downloadPost(id) {
-    const p   = (window._postsMap || {})[id];
-    const url = p ? p.url : '';
-    if (!url) { showMsg('Post data not found, please refresh.', 'error'); return; }
+        const playOverlay = `<div class="play-overlay">
+            <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="40" cy="40" r="38" fill="rgba(0,0,0,.45)" stroke="rgba(255,255,255,.7)" stroke-width="2"/>
+                <polygon points="32,24 60,40 32,56" fill="white"/>
+            </svg>
+        </div>`;
 
-    const btn  = document.getElementById('btn-'     + id);
-    const txt  = document.getElementById('btn-txt-' + id);
-    const spin = document.getElementById('spin-'    + id);
-    if (!btn) return;
+        const uploader = p.uploader ? `<div class="pc-uploader">📺 ${esc(p.uploader)}</div>` : '';
 
-    btn.disabled = true;
-    if (spin) spin.style.display = 'block';
-    if (txt)  txt.textContent    = 'Downloading…';
+        // Show title bold + description below; fall back gracefully
+        const titleHtml = title
+            ? `<div class="copy-row"><div class="pc-title">${esc(title)}</div><button class="copy-btn" data-copy="${esc(title)}" onclick="copyText(this.dataset.copy,this)" title="Copy title">⎘ Copy</button></div>`
+            : '';
+        const descHtml = desc && desc !== title
+            ? `<div class="copy-row"><div class="pc-desc">${esc(desc)}</div><button class="copy-btn" data-copy="${esc(desc)}" onclick="copyText(this.dataset.copy,this)" title="Copy description">⎘ Copy</button></div>`
+            : (!title ? `<div class="pc-desc" style="color:#aaa;font-style:italic;">No description</div>` : '');
 
-    // Build request body
-    const isYt = p.platform === 'youtube';
-    const body = isYt
-        ? { url, quality: document.getElementById('yt-grid-q-select').value }
-        : { url, content_type: 'both' };
+        return `
+        <div class="post-card ${cardCls}" id="card-${safeId}">
+            <div class="pc-thumb">
+                ${imgHtml}${noThumb}${playOverlay}
+                <span class="pc-badge">${badge}</span>${dur}
+            </div>
+            <div class="pc-body">
+                ${uploader}
+                ${titleHtml}${descHtml}
+                <button class="pc-dl-btn" id="btn-${safeId}" onclick="downloadPost('${safeId}')">
+                    <span id="btn-txt-${safeId}">📥 Download</span>
+                    <span class="spin" id="spin-${safeId}"></span>
+                </button>
+            </div>
+        </div>`;
+    }
 
-    try {
-        const data = await post('/api/download', body);
-        if (data.success) {
-            triggerBrowserDownload(data.filename);
-            addHistory({ filename: data.filename, size: data.file_size, url, time: new Date().toLocaleString() });
-            btn.disabled = false;
-            btn.classList.add('dl-done');
-            if (txt) txt.textContent = '✅ Saved!';
-            setTimeout(() => { btn.classList.remove('dl-done'); if (txt) txt.textContent = '📥 Download'; }, 3500);
-        } else {
+    /* ─── BROWSER SAVE DIALOG ────────────────────────────────────────────── */
+    function triggerBrowserDownload(filename) {
+        const a = document.createElement('a');
+        a.href = '/api/file/' + encodeURIComponent(filename);
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    /* ─── PER-CARD DOWNLOAD ──────────────────────────────────────────────── */
+    async function downloadPost(id) {
+        const p   = (window._postsMap || {})[id];
+        const url = p ? p.url : '';
+        if (!url) { showMsg('Post data not found, please refresh.', 'error'); return; }
+
+        const btn  = document.getElementById('btn-'     + id);
+        const txt  = document.getElementById('btn-txt-' + id);
+        const spin = document.getElementById('spin-'    + id);
+        if (!btn) return;
+
+        btn.disabled = true;
+        if (spin) spin.style.display = 'block';
+        if (txt)  txt.textContent    = 'Downloading…';
+
+        // Build request body
+        const isYt = p.platform === 'youtube';
+        const body = isYt
+            ? { url, quality: document.getElementById('yt-grid-q-select').value }
+            : { url, content_type: 'both' };
+
+        try {
+            const data = await post('/api/download', body);
+            if (data.success) {
+                triggerBrowserDownload(data.filename);
+                addHistory({ filename: data.filename, size: data.file_size, url, time: new Date().toLocaleString() });
+                btn.disabled = false;
+                btn.classList.add('dl-done');
+                if (txt) txt.textContent = '✅ Saved!';
+                setTimeout(() => { btn.classList.remove('dl-done'); if (txt) txt.textContent = '📥 Download'; }, 3500);
+            } else {
+                btn.disabled = false;
+                if (txt) txt.textContent = '📥 Download';
+                showMsg(data.error || 'Download failed', 'error');
+            }
+        } catch(e) {
             btn.disabled = false;
             if (txt) txt.textContent = '📥 Download';
-            showMsg(data.error || 'Download failed', 'error');
+            showMsg('Error: ' + e.message, 'error');
+        } finally {
+            if (spin) spin.style.display = 'none';
         }
-    } catch(e) {
-        btn.disabled = false;
-        if (txt) txt.textContent = '📥 Download';
-        showMsg('Error: ' + e.message, 'error');
-    } finally {
-        if (spin) spin.style.display = 'none';
     }
-}
 
-/* ─── DOWNLOAD ALL ───────────────────────────────────────────────────── */
-let _stopRequested = false;
-async function downloadAll() {
-    const ids = Object.keys(window._postsMap || {});
-    if (!ids.length) return;
-    _stopRequested = false;
-    const total = ids.length; let done = 0, failed = 0;
-    const allBtn=document.getElementById('dl-all-btn'), stopBtn=document.getElementById('stop-all-btn'),
-          spin=document.getElementById('dl-all-spin'), wrap=document.getElementById('dl-progress-wrap'),
-          fill=document.getElementById('dl-progress-fill'), txt=document.getElementById('dl-progress-text');
-    allBtn.disabled=true; allBtn.classList.remove('dl-done'); spin.style.display='inline-block';
-    stopBtn.style.display='inline-block'; wrap.style.visibility='visible';
-    fill.classList.remove('done'); fill.style.width='0%'; txt.textContent=`0 / ${total}`;
-    for (const id of ids) {
-        if (_stopRequested) break;
-        txt.textContent = `Downloading ${done+1} / ${total}…`;
-        try { await downloadPost(id); done++; } catch(e) { failed++; }
-        fill.style.width=`${Math.round(((done+failed)/total)*100)}%`;
-        txt.textContent=`${done+failed} / ${total}`;
-        if (!_stopRequested) await new Promise(r=>setTimeout(r,900));
-    }
-    spin.style.display='none'; stopBtn.style.display='none'; allBtn.disabled=false;
-    if (_stopRequested) {
-        allBtn.textContent='📥 Download All'; txt.textContent=`Stopped — ${done} downloaded`;
-        stopBtn.disabled=false; stopBtn.textContent='⏹ Stop';
-    } else {
-        fill.classList.add('done'); allBtn.classList.add('dl-done');
-        allBtn.innerHTML='✅ All Downloaded!';
-        txt.textContent=failed?`${done} done, ${failed} failed`:`✅ ${done} / ${total} saved`;
-        setTimeout(()=>{ allBtn.classList.remove('dl-done'); allBtn.innerHTML='<span class="dl-all-spin" id="dl-all-spin" style="display:none;"></span>📥 Download All'; fill.classList.remove('done'); },5000);
-    }
-}
-function stopAll() { _stopRequested=true; document.getElementById('stop-all-btn').disabled=true; document.getElementById('stop-all-btn').textContent='Stopping…'; }
-
-/* ─── SINGLE POST MODE ───────────────────────────────────────────────── */
-async function loadSinglePost(url, platform) {
-    showMsg('Loading preview…', 'info');
-    const igOpts = document.getElementById('ig-options');
-    const ytOpts = document.getElementById('yt-quality-row');
-    const twOpts = document.getElementById('tw-quality-row');
-    const fbOpts = document.getElementById('fb-quality-row');
-    const tkOpts = document.getElementById('tk-quality-row');
-    const dlBtn  = document.getElementById('s-dl-btn');
-
-    // Reset all
-    igOpts.style.display = 'none';
-    ytOpts.classList.remove('show');
-    twOpts.classList.remove('show');
-    fbOpts.classList.remove('show');
-    tkOpts.classList.remove('show');
-    dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn', 'generic-btn');
-
-    if      (platform === 'youtube')   { ytOpts.classList.add('show'); dlBtn.classList.add('yt-btn'); }
-    else if (platform === 'twitter')   { twOpts.classList.add('show'); dlBtn.classList.add('tw-btn'); }
-    else if (platform === 'facebook')  { fbOpts.classList.add('show'); dlBtn.classList.add('fb-btn'); }
-    else if (platform === 'tiktok')    { tkOpts.classList.add('show'); dlBtn.classList.add('tk-btn'); }
-    else if (platform === 'pinterest') { dlBtn.classList.add('pi-btn'); }
-    else if (platform === 'generic')   { dlBtn.classList.add('generic-btn'); }  // any other site
-    else                               { igOpts.style.display = 'flex'; }
-
-    try {
-        const data = await post('/api/preview', { url });
-        if (data.success && data.preview) {
-            previewData = data.preview;
-            showSinglePreview(previewData);
-            hideMsg();
+    /* ─── DOWNLOAD ALL ───────────────────────────────────────────────────── */
+    let _stopRequested = false;
+    async function downloadAll() {
+        const ids = Object.keys(window._postsMap || {});
+        if (!ids.length) return;
+        _stopRequested = false;
+        const total = ids.length; let done = 0, failed = 0;
+        const allBtn=document.getElementById('dl-all-btn'), stopBtn=document.getElementById('stop-all-btn'),
+              spin=document.getElementById('dl-all-spin'), wrap=document.getElementById('dl-progress-wrap'),
+              fill=document.getElementById('dl-progress-fill'), txt=document.getElementById('dl-progress-text');
+        allBtn.disabled=true; allBtn.classList.remove('dl-done'); spin.style.display='inline-block';
+        stopBtn.style.display='inline-block'; wrap.style.visibility='visible';
+        fill.classList.remove('done'); fill.style.width='0%'; txt.textContent=`0 / ${total}`;
+        for (const id of ids) {
+            if (_stopRequested) break;
+            txt.textContent = `Downloading ${done+1} / ${total}…`;
+            try { await downloadPost(id); done++; } catch(e) { failed++; }
+            fill.style.width=`${Math.round(((done+failed)/total)*100)}%`;
+            txt.textContent=`${done+failed} / ${total}`;
+            if (!_stopRequested) await new Promise(r=>setTimeout(r,900));
+        }
+        spin.style.display='none'; stopBtn.style.display='none'; allBtn.disabled=false;
+        if (_stopRequested) {
+            allBtn.textContent='📥 Download All'; txt.textContent=`Stopped — ${done} downloaded`;
+            stopBtn.disabled=false; stopBtn.textContent='⏹ Stop';
         } else {
+            fill.classList.add('done'); allBtn.classList.add('dl-done');
+            allBtn.innerHTML='✅ All Downloaded!';
+            txt.textContent=failed?`${done} done, ${failed} failed`:`✅ ${done} / ${total} saved`;
+            setTimeout(()=>{ allBtn.classList.remove('dl-done'); allBtn.innerHTML='<span class="dl-all-spin" id="dl-all-spin" style="display:none;"></span>📥 Download All'; fill.classList.remove('done'); },5000);
+        }
+    }
+    function stopAll() { _stopRequested=true; document.getElementById('stop-all-btn').disabled=true; document.getElementById('stop-all-btn').textContent='Stopping…'; }
+
+    /* ─── SINGLE POST MODE ───────────────────────────────────────────────── */
+    async function loadSinglePost(url, platform) {
+        showMsg('Loading preview…', 'info');
+        const igOpts = document.getElementById('ig-options');
+        const ytOpts = document.getElementById('yt-quality-row');
+        const twOpts = document.getElementById('tw-quality-row');
+        const fbOpts = document.getElementById('fb-quality-row');
+        const tkOpts = document.getElementById('tk-quality-row');
+        const dlBtn  = document.getElementById('s-dl-btn');
+
+        // Reset all
+        igOpts.style.display = 'none';
+        ytOpts.classList.remove('show');
+        twOpts.classList.remove('show');
+        fbOpts.classList.remove('show');
+        tkOpts.classList.remove('show');
+        dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn', 'generic-btn');
+
+        if      (platform === 'youtube')   { ytOpts.classList.add('show'); dlBtn.classList.add('yt-btn'); }
+        else if (platform === 'twitter')   { twOpts.classList.add('show'); dlBtn.classList.add('tw-btn'); }
+        else if (platform === 'facebook')  { fbOpts.classList.add('show'); dlBtn.classList.add('fb-btn'); }
+        else if (platform === 'tiktok')    { tkOpts.classList.add('show'); dlBtn.classList.add('tk-btn'); }
+        else if (platform === 'pinterest') { dlBtn.classList.add('pi-btn'); }
+        else if (platform === 'generic')   { dlBtn.classList.add('generic-btn'); }  // any other site
+        else                               { igOpts.style.display = 'flex'; }
+
+        try {
+            const data = await post('/api/preview', { url });
+            if (data.success && data.preview) {
+                previewData = data.preview;
+                showSinglePreview(previewData);
+                hideMsg();
+            } else {
+                previewData = null;
+                showSinglePreview({ thumbnail: null, description: '', is_video: true });
+                showMsg('Preview not available — you can still download.', 'info');
+            }
+        } catch(e) {
             previewData = null;
             showSinglePreview({ thumbnail: null, description: '', is_video: true });
-            showMsg('Preview not available — you can still download.', 'info');
         }
-    } catch(e) {
-        previewData = null;
-        showSinglePreview({ thumbnail: null, description: '', is_video: true });
-    }
-}
-
-function showSinglePreview(p) {
-    const thumb    = document.getElementById('s-thumb');
-    const thumbWrap = document.querySelector('.thumb-wrap');
-
-    // Set aspect ratio based on platform / content type
-    if (thumbWrap) {
-        thumbWrap.classList.remove('ratio-16-9', 'ratio-1-1');
-        thumbWrap.classList.add(
-            (currentPlatform === 'youtube' || currentPlatform === 'twitter' || currentPlatform === 'facebook' || currentPlatform === 'generic')
-            ? 'ratio-16-9'
-            : currentPlatform === 'tiktok'
-            ? 'ratio-9-16'
-            : 'ratio-1-1'
-        );
     }
 
-    if (p.thumbnail) {
-        thumb.src = thumbUrl(p.thumbnail);
-        thumb.style.display = 'block';
-    } else {
-        thumb.style.display = 'none';
-    }
+    function showSinglePreview(p) {
+        const thumb    = document.getElementById('s-thumb');
+        const thumbWrap = document.querySelector('.thumb-wrap');
 
-    document.getElementById('s-vc').style.display    = p.is_video ? 'flex' : 'none';
-    document.getElementById('s-title').textContent   = p.title || 'Result';
-    document.getElementById('s-meta').textContent    = p.uploader ? '📺 ' + p.uploader : '';
-    document.getElementById('s-title-copy').style.display = p.title ? 'inline-flex' : 'none';
+        // Set aspect ratio based on platform / content type
+        if (thumbWrap) {
+            thumbWrap.classList.remove('ratio-16-9', 'ratio-1-1');
+            thumbWrap.classList.add(
+                (currentPlatform === 'youtube' || currentPlatform === 'twitter' || currentPlatform === 'facebook' || currentPlatform === 'generic')
+                ? 'ratio-16-9'
+                : currentPlatform === 'tiktok'
+                ? 'ratio-9-16'
+                : 'ratio-1-1'
+            );
+        }
 
-    // Show description separately from title
-    const captionEl = document.getElementById('s-caption');
-    const desc = p.description || '';
-    const title = p.title || '';
-    captionEl.textContent = (desc && desc !== title) ? desc : '';
-    document.getElementById('s-caption-copy').style.display = (desc && desc !== title) ? 'inline-flex' : 'none';
-
-    // Text-only tweet — disable download button and show notice
-    const dlBtn  = document.getElementById('s-dl-btn');
-    const dlText = document.getElementById('s-dl-text');
-    if (p.no_video) {
-        dlBtn.disabled = true;
-        dlText.textContent = '📝 Text-only tweet — no video';
-        showMsg('This tweet contains text only. There is no video or image to download.', 'info');
-    } else {
-        dlBtn.disabled = false;
-        dlText.textContent = 'Download';
-    }
-
-    show('single-result');
-    setTimeout(() => document.getElementById('single-result').scrollIntoView({ behavior: 'smooth' }), 80);
-}
-
-async function singleDownload() {
-    const dlBtn  = document.getElementById('s-dl-btn');
-    const dlText = document.getElementById('s-dl-text');
-    setBusy('s-dl', true);
-    document.getElementById('ready-card').style.display = 'none';
-    hideMsg();
-
-    const body = currentPlatform === 'youtube'   ? { url: currentUrl, quality: ytQuality }
-               : currentPlatform === 'twitter'   ? { url: currentUrl, quality: twQuality }
-               : currentPlatform === 'facebook'  ? { url: currentUrl, quality: fbQuality }
-               : currentPlatform === 'tiktok'    ? { url: currentUrl, quality: tkQuality }
-               : currentPlatform === 'pinterest' ? { url: currentUrl }
-               : currentPlatform === 'generic'   ? { url: currentUrl }
-               : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
-
-    try {
-        const data = await post('/api/download', body);
-        if (data.success) {
-            triggerBrowserDownload(data.filename);
-            addHistory({ filename: data.filename, size: data.file_size, url: currentUrl, time: new Date().toLocaleString() });
-            setBusy('s-dl', false);
-            dlBtn.classList.add('dl-done');
-            dlText.textContent = '✅ Downloaded!';
-            setTimeout(() => { dlBtn.classList.remove('dl-done'); dlText.textContent = 'Download'; }, 3500);
-            showReadyCard(data);
+        if (p.thumbnail) {
+            thumb.src = thumbUrl(p.thumbnail);
+            thumb.style.display = 'block';
         } else {
-            showMsg(data.error || 'Download failed. Try again.', 'error');
+            thumb.style.display = 'none';
         }
-    } catch(e) {
-        showMsg('Connection error: ' + e.message, 'error');
-    } finally {
-        setBusy('s-dl', false);
+
+        document.getElementById('s-vc').style.display    = p.is_video ? 'flex' : 'none';
+        document.getElementById('s-title').textContent   = p.title || 'Result';
+        document.getElementById('s-meta').textContent    = p.uploader ? '📺 ' + p.uploader : '';
+        document.getElementById('s-title-copy').style.display = p.title ? 'inline-flex' : 'none';
+
+        // Show description separately from title
+        const captionEl = document.getElementById('s-caption');
+        const desc = p.description || '';
+        const title = p.title || '';
+        captionEl.textContent = (desc && desc !== title) ? desc : '';
+        document.getElementById('s-caption-copy').style.display = (desc && desc !== title) ? 'inline-flex' : 'none';
+
+        // Text-only tweet — disable download button and show notice
+        const dlBtn  = document.getElementById('s-dl-btn');
+        const dlText = document.getElementById('s-dl-text');
+        if (p.no_video) {
+            dlBtn.disabled = true;
+            dlText.textContent = '📝 Text-only tweet — no video';
+            showMsg('This tweet contains text only. There is no video or image to download.', 'info');
+        } else {
+            dlBtn.disabled = false;
+            dlText.textContent = 'Download';
+        }
+
+        show('single-result');
+        setTimeout(() => document.getElementById('single-result').scrollIntoView({ behavior: 'smooth' }), 80);
     }
-}
 
-function showReadyCard(data) {
-    const rc = document.getElementById('ready-card');
-    const rcThumb = document.getElementById('rc-thumb');
-    if (previewData?.thumbnail) { rcThumb.src = thumbUrl(previewData.thumbnail); rcThumb.style.display = 'block'; }
-    else { rcThumb.style.display = 'none'; }
+    async function singleDownload() {
+        const dlBtn  = document.getElementById('s-dl-btn');
+        const dlText = document.getElementById('s-dl-text');
+        setBusy('s-dl', true);
+        document.getElementById('ready-card').style.display = 'none';
+        hideMsg();
 
-    // Title (bold header)
-    const titleEl = document.getElementById('rc-title');
-    const title = previewData?.title || '';
-    titleEl.textContent = title;
-    document.getElementById('rc-title-row').style.display = title ? 'flex' : 'none';
+        const body = currentPlatform === 'youtube'   ? { url: currentUrl, quality: ytQuality }
+                   : currentPlatform === 'twitter'   ? { url: currentUrl, quality: twQuality }
+                   : currentPlatform === 'facebook'  ? { url: currentUrl, quality: fbQuality }
+                   : currentPlatform === 'tiktok'    ? { url: currentUrl, quality: tkQuality }
+                   : currentPlatform === 'pinterest' ? { url: currentUrl }
+                   : currentPlatform === 'generic'   ? { url: currentUrl }
+                   : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
 
-    // Description (body text) — only show if different from title
-    const descEl = document.getElementById('rc-caption');
-    const desc = previewData?.description || '';
-    descEl.textContent = desc;
-    document.getElementById('rc-caption-row').style.display = desc ? 'flex' : 'none';
-
-    // Divider — show only if we have at least one of title/description
-    document.getElementById('rc-divider').style.display = (title || desc) ? 'block' : 'none';
-
-    document.getElementById('rc-filename').textContent = '📄 ' + data.filename;
-    document.getElementById('rc-filesize').textContent = '📦 ' + data.file_size;
-    const link = document.getElementById('rc-link');
-    link.href = '/api/file/' + encodeURIComponent(data.filename);
-    link.download = data.filename;
-    rc.style.display = 'block';
-    rc.scrollIntoView({ behavior: 'smooth' });
-}
-
-/* ─── COPY TEXT ──────────────────────────────────────────────────────── */
-function copyText(text, btn) {
-    if (!text || !text.trim()) return;
-    const doFlash = () => {
-        if (!btn) return;
-        const orig = btn.innerHTML;
-        btn.innerHTML = '✓ Copied!';
-        btn.classList.add('copied');
-        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
-    };
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text.trim()).then(doFlash).catch(() => _copyFallback(text, doFlash));
-    } else {
-        _copyFallback(text, doFlash);
+        try {
+            const data = await post('/api/download', body);
+            if (data.success) {
+                triggerBrowserDownload(data.filename);
+                addHistory({ filename: data.filename, size: data.file_size, url: currentUrl, time: new Date().toLocaleString() });
+                setBusy('s-dl', false);
+                dlBtn.classList.add('dl-done');
+                dlText.textContent = '✅ Downloaded!';
+                setTimeout(() => { dlBtn.classList.remove('dl-done'); dlText.textContent = 'Download'; }, 3500);
+                showReadyCard(data);
+            } else {
+                showMsg(data.error || 'Download failed. Try again.', 'error');
+            }
+        } catch(e) {
+            showMsg('Connection error: ' + e.message, 'error');
+        } finally {
+            setBusy('s-dl', false);
+        }
     }
-}
-function _copyFallback(text, cb) {
-    const ta = document.createElement('textarea');
-    ta.value = text.trim();
-    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    try { document.execCommand('copy'); cb(); } catch(e) {}
-    document.body.removeChild(ta);
-}
 
-/* ─── PLAY & LIGHTBOX ────────────────────────────────────────────────── */
-function openPlay() {
-    if (currentUrl) window.open(currentUrl, '_blank', 'noopener');
-}
-function openLightbox() {
-    const thumb = document.getElementById('s-thumb');
-    if (!thumb || !thumb.src || thumb.style.display === 'none') return;
-    document.getElementById('lightbox-img').src = thumb.src;
-    document.getElementById('lightbox').classList.add('show');
-    document.body.style.overflow = 'hidden';
-}
-function closeLightbox() {
-    document.getElementById('lightbox').classList.remove('show');
-    document.body.style.overflow = '';
-}
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+    function showReadyCard(data) {
+        const rc = document.getElementById('ready-card');
+        const rcThumb = document.getElementById('rc-thumb');
+        if (previewData?.thumbnail) { rcThumb.src = thumbUrl(previewData.thumbnail); rcThumb.style.display = 'block'; }
+        else { rcThumb.style.display = 'none'; }
 
-/* ─── HELPERS ────────────────────────────────────────────────────────── */
-async function post(endpoint, body) {
-    const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    return r.json();
-}
-function showMsg(txt,type){const el=document.getElementById('msg');el.textContent=txt;el.className=type;el.style.display='block';}
-function showMsgHtml(html,type){const el=document.getElementById('msg');el.innerHTML=html;el.className=type;el.style.display='block';}
-function hideMsg(){document.getElementById('msg').style.display='none';}
-function show(id){document.getElementById(id).style.display='block';}
-function hide(id){document.getElementById(id).style.display='none';}
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function setBusy(prefix,on){
-    const btn=document.getElementById(prefix+'-btn')||document.getElementById(prefix+'-dl-btn');
-    const text=document.getElementById(prefix+'-text')||document.getElementById(prefix+'-dl-text');
-    const spin=document.getElementById(prefix+'-spin')||document.getElementById(prefix+'-dl-spin');
-    if(btn)btn.disabled=on;
-    if(text)text.textContent=on?'Loading…':(prefix==='search'?'Search':'Download');
-    if(spin)spin.style.display=on?'block':'none';
-}
-function addHistory(h){dlHistory.unshift(h);dlHistory=dlHistory.slice(0,5);localStorage.setItem('igDlHistory',JSON.stringify(dlHistory));renderHistory();}
-function renderHistory(){
-    const el=document.getElementById('history-list');
-    if(!dlHistory.length){el.innerHTML='<p style="color:#999;font-size:13px;">No downloads yet</p>';return;}
-    el.innerHTML=dlHistory.map(h=>`<div class="history-item"><strong>${esc(h.filename)}</strong><small>${esc(h.size)} · ${esc(h.time)}</small></div>`).join('');
-}
-/* ─── PASTE / CLEAR INPUT ────────────────────────────────────────────── */
-function _syncInputBtns() {
-    const hasText = document.getElementById('ig-url').value.length > 0;
-    document.getElementById('paste-btn').classList.toggle('visible', !hasText);
-    document.getElementById('clear-btn').classList.toggle('visible',  hasText);
-}
-async function pasteFromClipboard() {
-    try {
-        const text = await navigator.clipboard.readText();
+        // Title (bold header)
+        const titleEl = document.getElementById('rc-title');
+        const title = previewData?.title || '';
+        titleEl.textContent = title;
+        document.getElementById('rc-title-row').style.display = title ? 'flex' : 'none';
+
+        // Description (body text) — only show if different from title
+        const descEl = document.getElementById('rc-caption');
+        const desc = previewData?.description || '';
+        descEl.textContent = desc;
+        document.getElementById('rc-caption-row').style.display = desc ? 'flex' : 'none';
+
+        // Divider — show only if we have at least one of title/description
+        document.getElementById('rc-divider').style.display = (title || desc) ? 'block' : 'none';
+
+        document.getElementById('rc-filename').textContent = '📄 ' + data.filename;
+        document.getElementById('rc-filesize').textContent = '📦 ' + data.file_size;
+        const link = document.getElementById('rc-link');
+        link.href = '/api/file/' + encodeURIComponent(data.filename);
+        link.download = data.filename;
+        rc.style.display = 'block';
+        rc.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    /* ─── COPY TEXT ──────────────────────────────────────────────────────── */
+    function copyText(text, btn) {
+        if (!text || !text.trim()) return;
+        const doFlash = () => {
+            if (!btn) return;
+            const orig = btn.innerHTML;
+            btn.innerHTML = '✓ Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
+        };
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text.trim()).then(doFlash).catch(() => _copyFallback(text, doFlash));
+        } else {
+            _copyFallback(text, doFlash);
+        }
+    }
+    function _copyFallback(text, cb) {
+        const ta = document.createElement('textarea');
+        ta.value = text.trim();
+        ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try { document.execCommand('copy'); cb(); } catch(e) {}
+        document.body.removeChild(ta);
+    }
+
+    /* ─── PLAY & LIGHTBOX ────────────────────────────────────────────────── */
+    function openPlay() {
+        if (currentUrl) window.open(currentUrl, '_blank', 'noopener');
+    }
+    function openLightbox() {
+        const thumb = document.getElementById('s-thumb');
+        if (!thumb || !thumb.src || thumb.style.display === 'none') return;
+        document.getElementById('lightbox-img').src = thumb.src;
+        document.getElementById('lightbox').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+        document.getElementById('lightbox').classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+    /* ─── HELPERS ────────────────────────────────────────────────────────── */
+    async function post(endpoint, body) {
+        const r = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+        return r.json();
+    }
+    function showMsg(txt,type){const el=document.getElementById('msg');el.textContent=txt;el.className=type;el.style.display='block';}
+    function showMsgHtml(html,type){const el=document.getElementById('msg');el.innerHTML=html;el.className=type;el.style.display='block';}
+    function hideMsg(){document.getElementById('msg').style.display='none';}
+    function show(id){document.getElementById(id).style.display='block';}
+    function hide(id){document.getElementById(id).style.display='none';}
+    function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    function setBusy(prefix,on){
+        const btn=document.getElementById(prefix+'-btn')||document.getElementById(prefix+'-dl-btn');
+        const text=document.getElementById(prefix+'-text')||document.getElementById(prefix+'-dl-text');
+        const spin=document.getElementById(prefix+'-spin')||document.getElementById(prefix+'-dl-spin');
+        if(btn)btn.disabled=on;
+        if(text)text.textContent=on?'Loading…':(prefix==='search'?'Search':'Download');
+        if(spin)spin.style.display=on?'block':'none';
+    }
+    function addHistory(h){dlHistory.unshift(h);dlHistory=dlHistory.slice(0,5);localStorage.setItem('igDlHistory',JSON.stringify(dlHistory));renderHistory();}
+    function renderHistory(){
+        const el=document.getElementById('history-list');
+        if(!dlHistory.length){el.innerHTML='<p style="color:#999;font-size:13px;">No downloads yet</p>';return;}
+        el.innerHTML=dlHistory.map(h=>`<div class="history-item"><strong>${esc(h.filename)}</strong><small>${esc(h.size)} · ${esc(h.time)}</small></div>`).join('');
+    }
+    /* ─── PASTE / CLEAR INPUT ────────────────────────────────────────────── */
+    function _syncInputBtns() {
+        const hasText = document.getElementById('ig-url').value.length > 0;
+        document.getElementById('paste-btn').classList.toggle('visible', !hasText);
+        document.getElementById('clear-btn').classList.toggle('visible',  hasText);
+    }
+    async function pasteFromClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const input = document.getElementById('ig-url');
+            input.value = text.trim();
+            _syncInputBtns();
+            input.focus();
+        } catch(e) {
+            // Clipboard API blocked (e.g. non-HTTPS) — just focus the field
+            document.getElementById('ig-url').focus();
+        }
+    }
+    function clearInput() {
         const input = document.getElementById('ig-url');
-        input.value = text.trim();
+        input.value = '';
         _syncInputBtns();
         input.focus();
-    } catch(e) {
-        // Clipboard API blocked (e.g. non-HTTPS) — just focus the field
-        document.getElementById('ig-url').focus();
+        hideMsg();
+        hide('single-result');
+        hide('profile-result');
+        document.getElementById('ready-card').style.display = 'none';
     }
-}
-function clearInput() {
-    const input = document.getElementById('ig-url');
-    input.value = '';
-    _syncInputBtns();
-    input.focus();
-    hideMsg();
-    hide('single-result');
-    hide('profile-result');
-    document.getElementById('ready-card').style.display = 'none';
-}
-document.getElementById('ig-url').addEventListener('input', _syncInputBtns);
+    document.getElementById('ig-url').addEventListener('input', _syncInputBtns);
 
-document.getElementById('ig-url').addEventListener('keypress',e=>{if(e.key==='Enter')handleSearch();});
+    document.getElementById('ig-url').addEventListener('keypress',e=>{if(e.key==='Enter')handleSearch();});
 </script>
 </body>
 </html>

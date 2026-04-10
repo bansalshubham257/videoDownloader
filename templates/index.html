@@ -772,10 +772,15 @@ async function handleSearch() {
         } else if (type === 'profile') {
             currentPlatform = 'instagram';
             await loadProfile(url);
-        } else {
+        } else if (type === 'post' || type === 'reel') {
+            currentPlatform = 'instagram';
+            await loadSinglePost(url, 'instagram');
+        } else if (type === 'generic') {
             // generic_video — any URL yt-dlp might support (Vimeo, Twitch, Reddit, etc.)
             currentPlatform = 'generic';
             await loadSinglePost(url, 'generic');
+        } else {
+            showMsg('⚠️ Unknown URL type. Please paste a valid link from a supported website.', 'error');
         }
     } catch(e) {
         showMsg('Error: ' + e.message, 'error');

@@ -164,6 +164,7 @@ def detect_url_type(url):
       TikTok   → 'tiktok_video'   | 'tiktok_profile'
       Facebook → 'facebook_video' | 'facebook_profile'
       Pinterest→ 'pinterest_post' | 'pinterest_profile'
+      Generic  → 'generic' (for unknown/unsupported sites that yt-dlp can handle)
       Other    → 'unknown'
     """
     import re
@@ -213,6 +214,12 @@ def detect_url_type(url):
     if re.search(r'instagram\.com/([A-Za-z0-9_.]+)$', clean) and \
        not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
         return 'profile'
+
+    # ── Generic/Unknown website (try with yt-dlp) ────────────────────────
+    # If it's a valid URL from an unknown domain, mark it as 'generic'
+    # so the frontend knows it's an experimental download
+    if url.startswith('http://') or url.startswith('https://'):
+        return 'generic'
 
     return 'unknown'
 
@@ -766,12 +773,16 @@ def download():
             return try_download_methods(url, 'best', content_type)
 
         # ── Generic fallback — try yt-dlp for any other site ──
-        if not YTDLP_AVAILABLE:
-            return jsonify({'error': 'yt-dlp not available on this server'}), 500
-        result = download_generic(url, quality)
-        if result and result.status_code == 200:
-            return result
-        return jsonify({'error': '⚠️ Could not download from this URL. The site may not be supported or the video may be private.'}), 400
+        else:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not available on this server'}), 500
+            logger.info(f"🔄 Trying generic yt-dlp download for unknown site: {url}")
+            result = download_generic(url, quality)
+            if result and result.status_code == 200:
+                logger.info("✅ Generic download succeeded")
+                return result
+            logger.warning("⚠️ Generic download failed")
+            return jsonify({'error': '⚠️ Could not download from this URL. The site may not be supported, the video may be private, or require authentication.'}), 400
 
     except Exception as e:
         logger.error(f"❌ Download error: {e}", exc_info=True)

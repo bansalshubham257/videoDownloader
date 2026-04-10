@@ -906,6 +906,70 @@ TIKTOK_FORMATS = {
 }
 
 
+def _is_format_unavailable_error(err_text):
+    err = (err_text or '').lower()
+    return (
+        'requested format is not available' in err
+        or 'format is not available' in err
+        or 'no video formats found' in err
+        or 'requested format not available' in err
+    )
+
+
+def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=60, merge=False, postprocessors=None, scan_exts=None):
+    """Try yt-dlp with requested format, then progressively broader fallbacks.
+
+    If one format is unavailable, this retries with the next candidate and
+    eventually downloads any available format.
+    """
+    last_error = None
+    scan_exts = scan_exts or ('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg', 'jpg', 'jpeg', 'png', 'webp')
+
+    for fmt in format_candidates:
+        if not fmt:
+            continue
+        try:
+            ydl_opts = {
+                'format':         fmt,
+                'outtmpl':        outtmpl,
+                'quiet':          True,
+                'no_warnings':    True,
+                'socket_timeout': timeout,
+                'retries':        3,
+            }
+            if merge and FFMPEG_AVAILABLE:
+                ydl_opts['merge_output_format'] = 'mp4'
+            if postprocessors and FFMPEG_AVAILABLE:
+                ydl_opts['postprocessors'] = postprocessors
+
+            logger.info(f"   ↳ trying fmt: {fmt}")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if not info:
+                    continue
+                filename = ydl.prepare_filename(info)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in scan_exts:
+                        candidate = f"{base}.{ext}"
+                        if os.path.exists(candidate):
+                            filename = candidate
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    return filename, file_size
+        except Exception as e:
+            last_error = e
+            if _is_format_unavailable_error(str(e)):
+                logger.warning(f"   ✗ format unavailable, trying next: {e}")
+                continue
+            raise
+
+    if last_error:
+        raise last_error
+    return None, None
+
+
 def download_tiktok(url, quality='best'):
     """Download a TikTok video using yt-dlp."""
     try:
@@ -913,36 +977,28 @@ def download_tiktok(url, quality='best'):
         is_audio = (quality == 'audio')
         logger.info(f"🎵 TikTok download: quality={quality} | fmt={fmt[:50]}")
 
-        ydl_opts = {
-            'format':         fmt,
-            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
-            'quiet':          True,
-            'no_warnings':    True,
-            'socket_timeout': 60,
-            'retries':        3,
-        }
-        if not is_audio:
-            ydl_opts['merge_output_format'] = 'mp4'
+        if is_audio:
+            candidates = [fmt, 'bestaudio/best', 'best']
+        elif FFMPEG_AVAILABLE:
+            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+        else:
+            candidates = [fmt, 'best[ext=mp4]/best', 'best']
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info:
-                filename = ydl.prepare_filename(info)
-                if not os.path.exists(filename):
-                    base = os.path.splitext(filename)[0]
-                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
-                        candidate = f"{base}.{ext}"
-                        if os.path.exists(candidate):
-                            filename = candidate
-                            break
-                if os.path.exists(filename):
-                    file_size = os.path.getsize(filename)
-                    logger.info(f"✅ TikTok: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                    return jsonify({
-                        'success':   True,
-                        'filename':  os.path.basename(filename),
-                        'file_size': f"{file_size/(1024*1024):.2f} MB",
-                    })
+        filename, file_size = _download_with_format_fallback(
+            url,
+            os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            candidates,
+            timeout=60,
+            merge=(not is_audio),
+            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+        )
+        if filename:
+            logger.info(f"✅ TikTok: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size/(1024*1024):.2f} MB",
+            })
         return None
     except Exception as e:
         err = str(e).lower()
@@ -971,36 +1027,28 @@ def download_generic(url, quality='best'):
         is_audio = (quality == 'audio')
         logger.info(f"🌐 Generic download: {url} | quality={quality}")
 
-        ydl_opts = {
-            'format':         fmt,
-            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
-            'quiet':          True,
-            'no_warnings':    True,
-            'socket_timeout': 60,
-            'retries':        3,
-        }
-        if not is_audio:
-            ydl_opts['merge_output_format'] = 'mp4'
+        if is_audio:
+            candidates = [fmt, 'bestaudio/best', 'best']
+        elif FFMPEG_AVAILABLE:
+            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+        else:
+            candidates = [fmt, 'best[ext=mp4]/best', 'best']
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info:
-                filename = ydl.prepare_filename(info)
-                if not os.path.exists(filename):
-                    base = os.path.splitext(filename)[0]
-                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg'):
-                        candidate = f"{base}.{ext}"
-                        if os.path.exists(candidate):
-                            filename = candidate
-                            break
-                if os.path.exists(filename):
-                    file_size = os.path.getsize(filename)
-                    logger.info(f"✅ Generic: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                    return jsonify({
-                        'success':   True,
-                        'filename':  os.path.basename(filename),
-                        'file_size': f"{file_size/(1024*1024):.2f} MB",
-                    })
+        filename, file_size = _download_with_format_fallback(
+            url,
+            os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            candidates,
+            timeout=60,
+            merge=(not is_audio),
+            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg')
+        )
+        if filename:
+            logger.info(f"✅ Generic: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size/(1024*1024):.2f} MB",
+            })
         return None
     except Exception as e:
         err = str(e).lower()
@@ -1019,36 +1067,28 @@ def download_twitter(url, quality='best'):
         is_audio = (quality == 'audio')
         logger.info(f"🐦 Twitter/X download: quality={quality} | fmt={fmt[:50]}")
 
-        ydl_opts = {
-            'format':         fmt,
-            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
-            'quiet':          True,
-            'no_warnings':    True,
-            'socket_timeout': 60,
-            'retries':        3,
-        }
-        if not is_audio:
-            ydl_opts['merge_output_format'] = 'mp4'
+        if is_audio:
+            candidates = [fmt, 'bestaudio/best', 'best']
+        elif FFMPEG_AVAILABLE:
+            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+        else:
+            candidates = [fmt, 'best[ext=mp4]/best', 'best']
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info:
-                filename = ydl.prepare_filename(info)
-                if not os.path.exists(filename):
-                    base = os.path.splitext(filename)[0]
-                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
-                        candidate = f"{base}.{ext}"
-                        if os.path.exists(candidate):
-                            filename = candidate
-                            break
-                if os.path.exists(filename):
-                    file_size = os.path.getsize(filename)
-                    logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                    return jsonify({
-                        'success':   True,
-                        'filename':  os.path.basename(filename),
-                        'file_size': f"{file_size/(1024*1024):.2f} MB",
-                    })
+        filename, file_size = _download_with_format_fallback(
+            url,
+            os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
+            candidates,
+            timeout=60,
+            merge=(not is_audio),
+            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+        )
+        if filename:
+            logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size/(1024*1024):.2f} MB",
+            })
         return None
     except Exception as e:
         err = str(e).lower()
@@ -1189,36 +1229,28 @@ def download_facebook(url, quality='best'):
         is_audio = (quality == 'audio')
         logger.info(f"📘 Facebook download: quality={quality} | fmt={fmt[:50]}")
 
-        ydl_opts = {
-            'format':         fmt,
-            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
-            'quiet':          True,
-            'no_warnings':    True,
-            'socket_timeout': 60,
-            'retries':        3,
-        }
-        if not is_audio:
-            ydl_opts['merge_output_format'] = 'mp4'
+        if is_audio:
+            candidates = [fmt, 'bestaudio/best', 'best']
+        elif FFMPEG_AVAILABLE:
+            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+        else:
+            candidates = [fmt, 'best[ext=mp4]/best', 'best']
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info:
-                filename = ydl.prepare_filename(info)
-                if not os.path.exists(filename):
-                    base = os.path.splitext(filename)[0]
-                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a'):
-                        candidate = f"{base}.{ext}"
-                        if os.path.exists(candidate):
-                            filename = candidate
-                            break
-                if os.path.exists(filename):
-                    file_size = os.path.getsize(filename)
-                    logger.info(f"✅ Facebook: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                    return jsonify({
-                        'success':   True,
-                        'filename':  os.path.basename(filename),
-                        'file_size': f"{file_size/(1024*1024):.2f} MB",
-                    })
+        filename, file_size = _download_with_format_fallback(
+            url,
+            os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+            candidates,
+            timeout=60,
+            merge=(not is_audio),
+            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+        )
+        if filename:
+            logger.info(f"✅ Facebook: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size/(1024*1024):.2f} MB",
+            })
         return None
     except Exception as e:
         err = str(e).lower()
@@ -1235,43 +1267,38 @@ def download_youtube(url, quality='best', content_type='both'):
         fmt      = YT_FORMATS['audio'] if is_audio else YT_FORMATS.get(quality, YT_FORMATS['best'])
         logger.info(f"▶️ YouTube download: quality={quality} | fmt={fmt[:50]}")
 
-        ydl_opts = {
-            'format':         fmt,
-            'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
-            'quiet':          True,
-            'no_warnings':    True,
-            'socket_timeout': 120,
-            'retries':        3,
-        }
-        if not is_audio:
-            ydl_opts['merge_output_format'] = 'mp4'
+        if is_audio:
+            candidates = [fmt, 'bestaudio/best', 'best']
+            postprocessors = None
+            if FFMPEG_AVAILABLE:
+                postprocessors = [{
+                    'key':              'FFmpegExtractAudio',
+                    'preferredcodec':   'mp3',
+                    'preferredquality': '192',
+                }]
+        elif FFMPEG_AVAILABLE:
+            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            postprocessors = None
         else:
-            ydl_opts['postprocessors'] = [{
-                'key':              'FFmpegExtractAudio',
-                'preferredcodec':   'mp3',
-                'preferredquality': '192',
-            }]
+            candidates = [fmt, 'best[ext=mp4]/best', 'best']
+            postprocessors = None
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            if info:
-                filename = ydl.prepare_filename(info)
-                # Extension may change after merge/conversion – scan alternatives
-                if not os.path.exists(filename):
-                    base = os.path.splitext(filename)[0]
-                    for ext in ('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg'):
-                        candidate = f"{base}.{ext}"
-                        if os.path.exists(candidate):
-                            filename = candidate
-                            break
-                if os.path.exists(filename):
-                    file_size = os.path.getsize(filename)
-                    logger.info(f"✅ YouTube: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                    return jsonify({
-                        'success':   True,
-                        'filename':  os.path.basename(filename),
-                        'file_size': f"{file_size/(1024*1024):.2f} MB",
-                    })
+        filename, file_size = _download_with_format_fallback(
+            url,
+            os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
+            candidates,
+            timeout=120,
+            merge=(not is_audio),
+            postprocessors=postprocessors,
+            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a', 'ogg')
+        )
+        if filename:
+            logger.info(f"✅ YouTube: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+            return jsonify({
+                'success':   True,
+                'filename':  os.path.basename(filename),
+                'file_size': f"{file_size/(1024*1024):.2f} MB",
+            })
         return None
     except Exception as e:
         logger.warning(f"⚠️ YouTube download failed: {e}")

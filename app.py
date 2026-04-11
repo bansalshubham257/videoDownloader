@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context, after_this_request
 import os
+import base64
 import requests
 from urllib.parse import urlparse
 import json
@@ -96,12 +97,46 @@ USER_AGENTS = [
 ]
 
 YTDLP_COOKIE_FILE = (os.environ.get('YTDLP_COOKIE_FILE') or '').strip()
+YTDLP_COOKIE_FILE_FALLBACK = '/tmp/ytdlp_cookies.txt'
 YOUTUBE_COOKIE_FILE_FALLBACK = '/tmp/youtube_cookies.txt'
+YTDLP_COOKIES_TEXT = (os.environ.get('YTDLP_COOKIES_TEXT') or '').strip()
+YTDLP_COOKIES_B64 = (os.environ.get('YTDLP_COOKIES_B64') or '').strip()
 if YTDLP_COOKIE_FILE:
     if os.path.exists(YTDLP_COOKIE_FILE):
         logger.info(f"✅ YTDLP_COOKIE_FILE configured: {YTDLP_COOKIE_FILE}")
     else:
         logger.warning(f"⚠️ YTDLP_COOKIE_FILE does not exist: {YTDLP_COOKIE_FILE}")
+
+
+def bootstrap_ytdlp_cookies_from_env():
+    """Auto-populate yt-dlp cookie fallback file from env vars if provided."""
+    cookie_text = ''
+    if YTDLP_COOKIES_TEXT:
+        cookie_text = YTDLP_COOKIES_TEXT
+    elif YTDLP_COOKIES_B64:
+        try:
+            cookie_text = base64.b64decode(YTDLP_COOKIES_B64).decode('utf-8')
+        except Exception as e:
+            logger.warning(f"⚠️ Could not decode YTDLP_COOKIES_B64: {e}")
+            return
+
+    if not cookie_text:
+        return
+
+    try:
+        with open(YTDLP_COOKIE_FILE_FALLBACK, 'w', encoding='utf-8') as f:
+            f.write(cookie_text if cookie_text.endswith('\n') else cookie_text + '\n')
+        # Keep YouTube-specific fallback path in sync automatically.
+        with open(YOUTUBE_COOKIE_FILE_FALLBACK, 'w', encoding='utf-8') as f:
+            f.write(cookie_text if cookie_text.endswith('\n') else cookie_text + '\n')
+        os.chmod(YTDLP_COOKIE_FILE_FALLBACK, 0o600)
+        os.chmod(YOUTUBE_COOKIE_FILE_FALLBACK, 0o600)
+        logger.info("✅ yt-dlp cookies bootstrapped from environment")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not bootstrap yt-dlp cookies from env: {e}")
+
+
+bootstrap_ytdlp_cookies_from_env()
 
 def get_random_user_agent():
     return random.choice(USER_AGENTS)
@@ -127,8 +162,19 @@ def resolve_youtube_cookie_file():
     """Return a readable YouTube cookie file path if available, else ''."""
     if YTDLP_COOKIE_FILE and os.path.exists(YTDLP_COOKIE_FILE):
         return YTDLP_COOKIE_FILE
+    if os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+        return YTDLP_COOKIE_FILE_FALLBACK
     if os.path.exists(YOUTUBE_COOKIE_FILE_FALLBACK):
         return YOUTUBE_COOKIE_FILE_FALLBACK
+    return ''
+
+
+def resolve_ytdlp_cookie_file():
+    """Return a generic yt-dlp cookiefile for multi-site extraction if available."""
+    if YTDLP_COOKIE_FILE and os.path.exists(YTDLP_COOKIE_FILE):
+        return YTDLP_COOKIE_FILE
+    if os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+        return YTDLP_COOKIE_FILE_FALLBACK
     return ''
 
 
@@ -461,6 +507,50 @@ def youtube_clear_cookies():
         return jsonify({'error': 'Could not clear YouTube cookies'}), 500
 
 
+# ── /api/yt-dlp generic cookies ───────────────────────────────────────────
+@app.route('/api/ytdlp/cookie-status', methods=['GET'])
+def ytdlp_cookie_status():
+    cookie_file = resolve_ytdlp_cookie_file()
+    return jsonify({
+        'has_cookies': bool(cookie_file),
+        'cookie_file': cookie_file,
+    })
+
+
+@app.route('/api/ytdlp/set-cookies', methods=['POST'])
+def ytdlp_set_cookies():
+    """Save generic Netscape cookies file for yt-dlp across platforms."""
+    data = request.json or {}
+    cookies_text = (data.get('cookies_text') or '').strip()
+    if not cookies_text:
+        return jsonify({'error': 'cookies_text is required'}), 400
+
+    if 'HTTP Cookie File' not in cookies_text and '\t' not in cookies_text:
+        return jsonify({'error': 'Invalid cookie file content. Expected Netscape cookie format.'}), 400
+
+    try:
+        with open(YTDLP_COOKIE_FILE_FALLBACK, 'w', encoding='utf-8') as f:
+            f.write(cookies_text if cookies_text.endswith('\n') else cookies_text + '\n')
+        logger.info(f"✅ Generic yt-dlp cookies saved to {YTDLP_COOKIE_FILE_FALLBACK}")
+        return jsonify({'success': True, 'cookie_file': YTDLP_COOKIE_FILE_FALLBACK})
+    except Exception as e:
+        logger.error(f"❌ Could not save generic yt-dlp cookies: {e}")
+        return jsonify({'error': 'Could not save generic yt-dlp cookies'}), 500
+
+
+@app.route('/api/ytdlp/clear-cookies', methods=['POST'])
+def ytdlp_clear_cookies():
+    """Clear generic yt-dlp cookie fallback file."""
+    try:
+        if os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+            os.remove(YTDLP_COOKIE_FILE_FALLBACK)
+        logger.info("🗑 Generic yt-dlp cookies cleared")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"❌ Could not clear generic yt-dlp cookies: {e}")
+        return jsonify({'error': 'Could not clear generic yt-dlp cookies'}), 500
+
+
 # ── /api/profile ─────────────────────────────────────────────────────────────
 @app.route('/api/profile', methods=['POST'])
 def get_profile_posts():
@@ -784,6 +874,9 @@ def extract_preview_info(url):
                 'socket_timeout': 20,
                 'http_headers':   {'User-Agent': get_random_user_agent()},
             }
+            generic_cookie_file = resolve_ytdlp_cookie_file()
+            if generic_cookie_file:
+                ydl_opts['cookiefile'] = generic_cookie_file
             # Twitter requires a different user-agent and no Instagram cookie file
             if is_twitter:
                 ydl_opts['http_headers']['User-Agent'] = (
@@ -815,8 +908,8 @@ def extract_preview_info(url):
             if is_youtube_url(url) and is_youtube_bot_challenge_error(str(e)):
                 return {
                     '_error': (
-                        'YouTube is asking for bot verification on this server. '
-                        'Set env var YTDLP_COOKIE_FILE with exported YouTube cookies and redeploy, or try another video.'
+                        'This YouTube video is temporarily unavailable right now. '
+                        'Please try again in a moment.'
                     )
                 }
             logger.warning(f"⚠️ yt-dlp preview failed: {e}")
@@ -993,7 +1086,7 @@ def download():
             result = download_youtube(url)
             if result:
                 return result
-            return jsonify({'error': 'YouTube download failed. Video may be restricted or require authentication cookies.'}), 400
+            return jsonify({'error': 'YouTube download failed. This video may be temporarily unavailable right now.'}), 400
 
         # ── Instagram ──
         if 'instagram.com' in url:
@@ -1114,6 +1207,9 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
                     'User-Agent': get_random_user_agent(),
                 },
             }
+            cookie_file = resolve_ytdlp_cookie_file()
+            if cookie_file:
+                ydl_opts['cookiefile'] = cookie_file
             if ydl_overrides:
                 ydl_opts.update(ydl_overrides)
             if merge and FFMPEG_AVAILABLE:
@@ -1159,6 +1255,9 @@ def _extract_direct_media_url_with_ytdlp(url, timeout=60, ydl_overrides=None):
         'socket_timeout': timeout,
         'http_headers':   {'User-Agent': get_random_user_agent()},
     }
+    cookie_file = resolve_ytdlp_cookie_file()
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
     if ydl_overrides:
         ydl_opts.update(ydl_overrides)
 
@@ -1597,9 +1696,8 @@ def download_youtube(url, quality='best', content_type='both'):
         if is_youtube_bot_challenge_error(str(e)):
             return jsonify({
                 'error': (
-                    'YouTube blocked this request with bot verification. '
-                    'Upload YouTube Netscape cookies via /api/youtube/set-cookies '
-                    'or configure YTDLP_COOKIE_FILE, then retry.'
+                    'This YouTube video is temporarily unavailable right now. '
+                    'Please try again in a moment.'
                 )
             }), 400
         logger.warning(f"⚠️ YouTube download failed: {e}")

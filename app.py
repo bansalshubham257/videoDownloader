@@ -1125,6 +1125,13 @@ def download():
 def try_download_methods(url, format_id, content_type='both'):
     """Try multiple download methods in order of reliability"""
 
+    # Reels (/reel/) and IGTV (/tv/) are definitively video-only posts.
+    # Never fall back to the photo downloader for them — that would silently
+    # serve the cover thumbnail (a JPG) as the "downloaded file" when yt-dlp
+    # is rate-limited, causing mobile users to download a thumbnail instead
+    # of the actual video.
+    is_video_url = '/reel/' in url or '/tv/' in url
+
     methods = []
 
     # Method 1: yt-dlp for videos; automatically falls through to photo handler on "no video"
@@ -1132,7 +1139,10 @@ def try_download_methods(url, format_id, content_type='both'):
         methods.append(('yt-dlp', download_with_ytdlp, [url, format_id, content_type]))
 
     # Method 2: Dedicated Instagram photo downloader (Instagram API + CDN direct)
-    methods.append(('Instagram Photo', download_instagram_photo, [url]))
+    # Skip entirely for definite video-only posts (reels, IGTV) to prevent
+    # the photo downloader from returning the cover thumbnail as a "download".
+    if not is_video_url:
+        methods.append(('Instagram Photo', download_instagram_photo, [url]))
 
     # Method 3: Instagrapi
     if INSTAGRAPI_AVAILABLE:
@@ -1151,6 +1161,16 @@ def try_download_methods(url, format_id, content_type='both'):
         except Exception as e:
             logger.warning(f"⚠️ {method_name} failed: {str(e)}")
             continue
+
+    # Give a more specific error for reels so users understand the issue.
+    if is_video_url:
+        return jsonify({
+            'error': (
+                'Instagram is rate-limiting or blocking this reel right now. '
+                'Please try again in a few minutes. '
+                'If it keeps failing, the reel may require login to access.'
+            )
+        }), 400
 
     return jsonify({
         'error': 'All download methods failed. Instagram may be blocking this content. Try again in a few minutes.'
@@ -2013,6 +2033,16 @@ def download_instagram_photo(url):
       D) Page scrape (display_url / og:image)      (may work for some posts)
     """
     import re
+
+    # Reels (/reel/) and IGTV (/tv/) are video-only posts.
+    # Returning their cover thumbnail as a "download" is misleading, so bail out
+    # immediately. This acts as a defense-in-depth guard on top of the check in
+    # try_download_methods(), covering any direct call path (e.g. the "no video"
+    # delegation inside download_with_ytdlp).
+    if '/reel/' in url or '/tv/' in url:
+        logger.info(f"⏭️  Photo downloader: skipping video URL (reel/IGTV) – {url}")
+        return None
+
     shortcode = _extract_shortcode(url)
     if not shortcode:
         return None
@@ -2217,8 +2247,11 @@ def download_with_ytdlp(url, format_id='best', content_type='both'):
 
     except Exception as e:
         err = str(e)
-        # yt-dlp raises this for photo posts – hand off to the dedicated photo handler
-        if 'no video' in err.lower():
+        # yt-dlp raises this for photo posts – hand off to the dedicated photo handler.
+        # Guard against reel/tv URLs: those are always video posts; if yt-dlp says "no
+        # video" for them it's an extraction error, not a photo post, so don't return
+        # the cover thumbnail.
+        if 'no video' in err.lower() and '/reel/' not in url and '/tv/' not in url:
             logger.info("📸 yt-dlp: no video in post – delegating to photo downloader")
             return download_instagram_photo(url)
         logger.warning(f"⚠️ yt-dlp failed: {err}")

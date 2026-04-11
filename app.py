@@ -1362,6 +1362,134 @@ def _extract_direct_media_url_with_ytdlp(url, timeout=60, ydl_overrides=None):
     return ranked[0][1], ranked[0][2]
 
 
+def _extract_twitter_video_direct(tweet_id):
+    """Extract video URL directly from Twitter syndication API."""
+    try:
+        endpoint = f'https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&lang=en'
+        logger.info(f"   Fetching: {endpoint[:80]}...")
+        
+        r = requests.get(
+            endpoint, 
+            timeout=10,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        )
+        
+        if r.status_code != 200:
+            logger.warning(f"   → Status {r.status_code}")
+            return None
+        
+        data = r.json()
+        media_details = data.get('mediaDetails') or []
+        
+        if not media_details:
+            logger.info(f"   → No media in response")
+            return None
+        
+        first_media = media_details[0]
+        
+        # Look for video variants
+        video_info = first_media.get('video_info') or {}
+        variants = video_info.get('variants') or []
+        
+        # Find MP4 variant (highest bitrate)
+        mp4_variants = [v for v in variants if v.get('content_type') == 'video/mp4']
+        if mp4_variants:
+            mp4_variants.sort(key=lambda x: int(x.get('bitrate', 0)), reverse=True)
+            video_url = mp4_variants[0].get('url')
+            if video_url:
+                logger.info(f"   ✅ Found MP4 video")
+                return video_url
+        
+        logger.info(f"   → No MP4 video found")
+        return None
+        
+    except Exception as e:
+        logger.warning(f"   → Error: {str(e)[:100]}")
+        return None
+
+
+def _extract_twitter_video_alt(tweet_id):
+    """Extract video URL from alternative Twitter APIs (fxtwitter/vxtwitter)."""
+    try:
+        endpoints = [
+            f'https://api.vxtwitter.com/status/{tweet_id}',  # Try vxtwitter first (more reliable)
+            f'https://api.fxtwitter.com/status/{tweet_id}',
+        ]
+        
+        for endpoint in endpoints:
+            logger.info(f"   Trying: {endpoint[:60]}...")
+            
+            try:
+                r = requests.get(
+                    endpoint,
+                    timeout=10,
+                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                )
+                
+                if r.status_code != 200:
+                    logger.debug(f"   → Status {r.status_code}")
+                    continue
+                
+                data = r.json()
+                
+                # Handle different response structures
+                # Structure 1: {"tweet": {...}}
+                tweet_data = data.get('tweet')
+                if not tweet_data:
+                    # Structure 2: direct response
+                    tweet_data = data
+                
+                # Look for media array
+                if isinstance(tweet_data, dict):
+                    media_list = tweet_data.get('media') or []
+                    
+                    # Try to find MP4 URL in media
+                    for media in media_list:
+                        if isinstance(media, dict):
+                            video_url = media.get('url')
+                            if video_url and '.mp4' in str(video_url):
+                                logger.info(f"   ✅ Found MP4 in media: {str(video_url)[:80]}...")
+                                return str(video_url)
+                
+                # Fallback: recursive search for MP4 URLs anywhere in response
+                def find_mp4_url(obj, depth=0):
+                    if depth > 20:  # Prevent infinite recursion
+                        return None
+                    
+                    if isinstance(obj, dict):
+                        for k, v in obj.items():
+                            if isinstance(v, str):
+                                if 'video.twimg.com' in v and '.mp4' in v:
+                                    return v
+                            elif isinstance(v, (dict, list)):
+                                result = find_mp4_url(v, depth + 1)
+                                if result:
+                                    return result
+                    elif isinstance(obj, list):
+                        for item in obj:
+                            if isinstance(item, (dict, list)):
+                                result = find_mp4_url(item, depth + 1)
+                                if result:
+                                    return result
+                    return None
+                
+                mp4_url = find_mp4_url(data)
+                if mp4_url:
+                    logger.info(f"   ✅ Found MP4 via recursive search: {mp4_url[:80]}...")
+                    return mp4_url
+                    
+            except Exception as e:
+                logger.debug(f"   → Error: {str(e)[:50]}")
+                continue
+        
+        logger.info(f"   → No video found in alternative APIs")
+        return None
+        
+    except Exception as e:
+        logger.warning(f"   → Alt API error: {str(e)[:100]}")
+        return None
+
+
 def _extract_tweet_id(url):
     import re
     m = re.search(r'/status/(\d+)', url)
@@ -1672,74 +1800,71 @@ def _download_twitter_via_public_fallbacks(url):
     return None
 
 def download_twitter(url, quality='best'):
-    """Download a Twitter/X video using yt-dlp with improved fallback handling."""
-    error_text = ''
-
+    """Download a Twitter/X video - only videos, using direct extraction."""
+    logger.info(f"🐦 Twitter/X download: {url} | quality={quality}")
+    
+    # Extract tweet ID
+    import re
+    tweet_id_match = re.search(r'/status/(\d+)', url)
+    if not tweet_id_match:
+        return jsonify({'error': '❌ Invalid Twitter URL. Please use a tweet URL with /status/ID'}), 400
+    
+    tweet_id = tweet_id_match.group(1)
+    logger.info(f"   Tweet ID: {tweet_id}")
+    
+    # Step 1: Try direct video extraction via syndication API (most reliable)
+    logger.info(f"   → Trying syndication API...")
+    video_url = _extract_twitter_video_direct(tweet_id)
+    if video_url:
+        logger.info(f"   ✅ Found video URL from syndication")
+        result = _download_raw_url(video_url, 'mp4')
+        if result:
+            return result
+    
+    # Step 2: Try yt-dlp with minimal config
     if YTDLP_AVAILABLE:
+        logger.info(f"   → Trying yt-dlp...")
         try:
-            fmt = TWITTER_FORMATS.get(quality, TWITTER_FORMATS['best'])
-            is_audio = (quality == 'audio')
-            logger.info(f"🐦 Twitter/X download: quality={quality} | fmt={fmt[:50]}")
-
-            if is_audio:
-                candidates = [fmt, 'bestaudio/best', 'best']
-            elif FFMPEG_AVAILABLE:
-                candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
-            else:
-                candidates = [fmt, 'best[ext=mp4]/best', 'best']
-
-            # Add Twitter-specific ydl_overrides with better user-agent and settings
-            twitter_overrides = {
+            ydl_opts = {
+                'format': 'best[ext=mp4]/best',
+                'quiet': False,
+                'no_warnings': False,
+                'socket_timeout': 30,
                 'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept': '*/*',
-                    'Accept-Language': 'en-US,en;q=0.9',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
                 },
-                'extractor_args': {
-                    'twitter': {
-                        'api': 'graphql'  # Use GraphQL API which is more reliable
-                    }
-                },
-                'socket_timeout': 60,
-                'retries': 5,  # Increased retries for Twitter
             }
-
-            filename, file_size = _download_with_format_fallback(
-                url,
-                os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
-                candidates,
-                timeout=60,
-                merge=(not is_audio),
-                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a'),
-                ydl_overrides=twitter_overrides
-            )
-            if filename:
-                logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-                return jsonify({
-                    'success':   True,
-                    'filename':  os.path.basename(filename),
-                    'file_size': f"{file_size/(1024*1024):.2f} MB",
-                })
-
-            error_text = 'yt-dlp returned no downloadable file'
-            logger.warning("⚠️ Twitter yt-dlp returned no file; trying API fallbacks")
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if info and info.get('formats'):
+                    # Find best MP4 video format
+                    mp4_formats = [f for f in info.get('formats', []) 
+                                  if f.get('ext') == 'mp4' and f.get('vcodec') != 'none']
+                    if mp4_formats:
+                        # Sort by height (quality)
+                        mp4_formats.sort(key=lambda x: int(x.get('height') or 0), reverse=True)
+                        best_format = mp4_formats[0]
+                        direct_url = best_format.get('url')
+                        if direct_url:
+                            logger.info(f"   ✅ Found video from yt-dlp: {best_format.get('height')}p")
+                            result = _download_raw_url(direct_url, 'mp4')
+                            if result:
+                                return result
         except Exception as e:
-            error_text = str(e)
-            logger.warning(f"⚠️ Twitter yt-dlp failed: {e}")
-    else:
-        error_text = 'yt-dlp not installed'
-        logger.warning("⚠️ yt-dlp unavailable; trying Twitter fallback APIs")
-
-    fallback_result = _download_twitter_via_public_fallbacks(url)
-    if fallback_result:
-        return fallback_result
-
-    err = error_text.lower()
-    if 'no video' in err or 'no media' in err or 'does not have' in err:
-        return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
-    if 'guest token' in err or 'bad guest' in err:
-        return jsonify({'error': '⚠️ Twitter API temporarily unavailable. Please try again in a moment.'}), 400
-    return None
+            logger.warning(f"   ⚠️ yt-dlp error: {str(e)[:100]}")
+    
+    # Step 3: Try alternative APIs
+    logger.info(f"   → Trying alternative APIs...")
+    alt_video_url = _extract_twitter_video_alt(tweet_id)
+    if alt_video_url:
+        logger.info(f"   ✅ Found video from alternative API")
+        result = _download_raw_url(alt_video_url, 'mp4')
+        if result:
+            return result
+    
+    logger.warning(f"   ❌ No video found in tweet")
+    return jsonify({'error': '❌ No video found in this tweet. Tweet may contain only text or images.'}), 400
 
 
 def download_pinterest(url):

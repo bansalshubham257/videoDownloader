@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_file, Response,
 import os
 import base64
 import requests
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 import json
 from pathlib import Path
 import logging
@@ -263,15 +263,39 @@ def cookies_are_set():
 
 def normalize_twitter_url(url):
     """
-    Convert x.com → twitter.com and strip tracking query params (?s=, ?t=, etc.)
-    yt-dlp's Twitter extractor only supports twitter.com, not x.com.
+    Convert X/Twitter variants to canonical twitter.com status URLs and
+    strip query/fragment tracking params.
     """
-    # Replace x.com domain with twitter.com
-    url = url.replace('https://x.com/', 'https://twitter.com/')
-    url = url.replace('http://x.com/',  'https://twitter.com/')
-    # Strip all query params (Twitter tracking params like ?s=20 break yt-dlp)
-    url = url.split('?')[0].split('#')[0]
-    return url
+    import re
+
+    raw = (url or '').strip()
+    if not raw:
+        return raw
+
+    try:
+        parsed = urlparse(raw)
+        host = (parsed.netloc or '').lower()
+        path = parsed.path or ''
+    except Exception:
+        # Keep previous behavior for malformed-but-usable inputs.
+        return raw.split('?')[0].split('#')[0]
+
+    host = host.replace('www.', '')
+    if host.startswith('m.'):
+        host = host[2:]
+    if host.endswith('x.com'):
+        host = 'twitter.com'
+
+    # Canonicalize unusual status paths to improve extractor matching.
+    m = re.search(r'/status/(\d+)', path)
+    if m:
+        prefix = path[:m.start()] or ''
+        username = prefix.strip('/').split('/')[-1] if prefix.strip('/') else ''
+        status_id = m.group(1)
+        path = f'/{username}/status/{status_id}' if username else f'/i/status/{status_id}'
+
+    cleaned = parsed._replace(scheme='https', netloc=host, path=path, query='', fragment='')
+    return urlunparse(cleaned)
 
 
 # ── URL type detection ──────────────────────────────────────────────────────
@@ -1084,8 +1108,6 @@ def download():
 
         # ── Twitter / X ──
         if 'twitter.com' in url or 'x.com' in url:
-            if not YTDLP_AVAILABLE:
-                return jsonify({'error': 'yt-dlp not installed'}), 500
             result = download_twitter(url, quality)
             if result:
                 return result
@@ -1538,66 +1560,77 @@ def download_generic(url, quality='best'):
         return None
 
 
+def _download_twitter_via_public_fallbacks(url):
+    """Try public metadata APIs and download the discovered media URL."""
+    for source_name, fetcher in (
+        ('syndication', _fetch_twitter_syndication_media),
+        ('alt api', _fetch_twitter_alt_api_media),
+    ):
+        try:
+            data = fetcher(url) or {}
+            media_url = data.get('media_url')
+            if media_url:
+                logger.info(f"🐦 Twitter {source_name} fallback used")
+                ext = 'mp4' if data.get('is_video') else 'jpg'
+                result = _download_raw_url(media_url, ext)
+                if result:
+                    return result
+        except Exception as e:
+            logger.warning(f"⚠️ Twitter {source_name} fallback failed: {e}")
+    return None
+
 def download_twitter(url, quality='best'):
     """Download a Twitter/X video using yt-dlp."""
-    try:
-        fmt = TWITTER_FORMATS.get(quality, TWITTER_FORMATS['best'])
-        is_audio = (quality == 'audio')
-        logger.info(f"🐦 Twitter/X download: quality={quality} | fmt={fmt[:50]}")
+    error_text = ''
 
-        if is_audio:
-            candidates = [fmt, 'bestaudio/best', 'best']
-        elif FFMPEG_AVAILABLE:
-            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
-        else:
-            candidates = [fmt, 'best[ext=mp4]/best', 'best']
-
-        filename, file_size = _download_with_format_fallback(
-            url,
-            os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
-            candidates,
-            timeout=60,
-            merge=(not is_audio),
-            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
-        )
-        if filename:
-            logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-            return jsonify({
-                'success':   True,
-                'filename':  os.path.basename(filename),
-                'file_size': f"{file_size/(1024*1024):.2f} MB",
-            })
-        return None
-    except Exception as e:
-        err = str(e).lower()
+    if YTDLP_AVAILABLE:
         try:
-            synd = _fetch_twitter_syndication_media(url)
-            if synd.get('media_url'):
-                logger.info("🐦 Twitter syndication fallback used")
-                ext = 'mp4' if synd.get('is_video') else 'jpg'
-                result = _download_raw_url(synd['media_url'], ext)
-                if result:
-                    return result
-        except Exception as synd_e:
-            logger.warning(f"⚠️ Twitter syndication fallback failed: {synd_e}")
+            fmt = TWITTER_FORMATS.get(quality, TWITTER_FORMATS['best'])
+            is_audio = (quality == 'audio')
+            logger.info(f"🐦 Twitter/X download: quality={quality} | fmt={fmt[:50]}")
 
-        try:
-            alt = _fetch_twitter_alt_api_media(url)
-            if alt.get('media_url'):
-                logger.info("🐦 Twitter alt API fallback used")
-                ext = 'mp4' if alt.get('is_video') else 'jpg'
-                result = _download_raw_url(alt['media_url'], ext)
-                if result:
-                    return result
-        except Exception as alt_e:
-            logger.warning(f"⚠️ Twitter alt API fallback failed: {alt_e}")
+            if is_audio:
+                candidates = [fmt, 'bestaudio/best', 'best']
+            elif FFMPEG_AVAILABLE:
+                candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            else:
+                candidates = [fmt, 'best[ext=mp4]/best', 'best']
 
-        if 'no video' in err or 'no media' in err or 'does not have' in err:
-            return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
-        if 'guest token' in err or 'bad guest' in err:
-            return jsonify({'error': '⚠️ Twitter API temporarily unavailable. Please try again in a moment.'}), 400
-        logger.warning(f"⚠️ Twitter download failed: {e}")
-        return None
+            filename, file_size = _download_with_format_fallback(
+                url,
+                os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
+                candidates,
+                timeout=60,
+                merge=(not is_audio),
+                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+            )
+            if filename:
+                logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
+
+            error_text = 'yt-dlp returned no downloadable file'
+            logger.warning("⚠️ Twitter yt-dlp returned no file; trying API fallbacks")
+        except Exception as e:
+            error_text = str(e)
+            logger.warning(f"⚠️ Twitter yt-dlp failed: {e}")
+    else:
+        error_text = 'yt-dlp not installed'
+        logger.warning("⚠️ yt-dlp unavailable; trying Twitter fallback APIs")
+
+    fallback_result = _download_twitter_via_public_fallbacks(url)
+    if fallback_result:
+        return fallback_result
+
+    err = error_text.lower()
+    if 'no video' in err or 'no media' in err or 'does not have' in err:
+        return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
+    if 'guest token' in err or 'bad guest' in err:
+        return jsonify({'error': '⚠️ Twitter API temporarily unavailable. Please try again in a moment.'}), 400
+    return None
 
 
 def download_pinterest(url):

@@ -75,6 +75,15 @@ except ImportError:
     INSTAGRAPI_AVAILABLE = False
     logger.warning("⚠️ Instagrapi not available")
 
+# Try to import instaloader
+try:
+    import instaloader
+    INSTALOADER_AVAILABLE = True
+    logger.info("✅ Instaloader available")
+except ImportError:
+    INSTALOADER_AVAILABLE = False
+    logger.warning("⚠️ Instaloader not available")
+
 # Try to import Selenium
 try:
     from selenium import webdriver
@@ -1049,6 +1058,15 @@ def extract_preview_info(url):
                     preview_data['is_video'] = ('/reel/' in clean)
                     preview_data['type'] = 'video' if preview_data['is_video'] else 'photo'
                     logger.info("✅ Instagram embed fallback succeeded")
+
+                # Also try to extract a video thumbnail URL from embedded JSON
+                # (uses the same deep extractor as the download pipeline)
+                if not preview_data.get('thumbnail') and kind == 'reel':
+                    video_url = _extract_reel_video_from_embed(shortcode)
+                    if video_url:
+                        preview_data['is_video'] = True
+                        preview_data['type'] = 'video'
+                        logger.info("✅ Embed: found video URL in JSON data")
         except Exception as e:
             logger.warning(f"⚠️ Instagram embed preview failed: {e}")
 
@@ -1141,6 +1159,246 @@ def download():
         logger.error(f"❌ Download error: {e}", exc_info=True)
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
 
+def _extract_reel_video_from_embed(shortcode):
+    """
+    Deep-parse the Instagram embed page for a video CDN URL.
+    Instagram's embed endpoint is public (no auth required) and embeds
+    the full media JSON inside <script> tags — this is what most working
+    third-party Instagram downloaders rely on.
+    """
+    import re
+    import json as json_lib
+
+    embed_urls = [
+        f"https://www.instagram.com/reel/{shortcode}/embed/captioned/",
+        f"https://www.instagram.com/reel/{shortcode}/embed/",
+        f"https://www.instagram.com/p/{shortcode}/embed/captioned/",
+        f"https://www.instagram.com/p/{shortcode}/embed/",
+    ]
+
+    # Instagram embed pages respond differently for mobile vs desktop user agents.
+    headers_variants = [
+        {
+            'User-Agent': (
+                'Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        {
+            'User-Agent': (
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+                'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+        {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        },
+    ]
+
+    def _find_video_url_in_obj(obj, depth=0):
+        """Recursively search any parsed JSON object for a video CDN URL."""
+        if depth > 15:
+            return None
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in ('video_url', 'playback_url', 'browser_native_sd_url',
+                         'browser_native_hd_url', 'dash_abr_playback_url',
+                         'dash_hd_playback_url', 'dash_sd_playback_url') and isinstance(v, str):
+                    if v.startswith('http') and ('fbcdn' in v or 'cdninstagram' in v or 'instagram' in v):
+                        return v
+                result = _find_video_url_in_obj(v, depth + 1)
+                if result:
+                    return result
+        elif isinstance(obj, list):
+            for item in obj:
+                result = _find_video_url_in_obj(item, depth + 1)
+                if result:
+                    return result
+        return None
+
+    for embed_url in embed_urls:
+        for hdrs in headers_variants:
+            try:
+                resp = requests.get(embed_url, headers=hdrs, timeout=20)
+                if resp.status_code != 200:
+                    continue
+
+                html = resp.text
+
+                # ── Quick regex scan for video URLs in the raw HTML ──────────
+                direct_video_patterns = [
+                    # Quoted video_url JSON value pointing to CDN
+                    r'"video_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
+                    r'"video_url"\s*:\s*"(https://[^"]*(?:fbcdn|cdninstagram)[^"]+)"',
+                    r'"playback_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
+                    r'"browser_native_(?:sd|hd)_url"\s*:\s*"(https://[^"]+)"',
+                    # HTML <video src=...>
+                    r'<video[^>]+src="(https://[^"]+\.mp4[^"]*)"',
+                    r'<source[^>]+src="(https://[^"]+\.mp4[^"]*)"',
+                ]
+                for pat in direct_video_patterns:
+                    m = re.search(pat, html, re.IGNORECASE)
+                    if m:
+                        video_url = _unescape_url(m.group(1))
+                        logger.info(f"✅ Embed video extraction: found via direct pattern")
+                        return video_url
+
+                # ── Parse JSON blobs inside <script> tags ────────────────────
+                script_contents = re.findall(
+                    r'<script[^>]*>\s*(window\.__additionalDataLoaded.*?|window\._sharedData.*?|\{.*?)\s*</script>',
+                    html, re.DOTALL
+                )
+                for script_block in script_contents:
+                    # window.__additionalDataLoaded('...', {...})
+                    m = re.search(
+                        r'window\.__additionalDataLoaded\s*\([^,]+,\s*({.+})\s*\)\s*;',
+                        script_block, re.DOTALL
+                    )
+                    if m:
+                        try:
+                            data = json_lib.loads(m.group(1))
+                            video_url = _find_video_url_in_obj(data)
+                            if video_url:
+                                logger.info("✅ Embed video: __additionalDataLoaded JSON")
+                                return _unescape_url(video_url)
+                        except Exception:
+                            pass
+
+                    # window._sharedData = {...};
+                    m = re.search(
+                        r'window\._sharedData\s*=\s*({.+?})\s*;',
+                        script_block, re.DOTALL
+                    )
+                    if m:
+                        try:
+                            data = json_lib.loads(m.group(1))
+                            video_url = _find_video_url_in_obj(data)
+                            if video_url:
+                                logger.info("✅ Embed video: _sharedData JSON")
+                                return _unescape_url(video_url)
+                        except Exception:
+                            pass
+
+                    # Generic JSON object in script
+                    if script_block.strip().startswith('{'):
+                        try:
+                            data = json_lib.loads(script_block.strip())
+                            video_url = _find_video_url_in_obj(data)
+                            if video_url:
+                                logger.info("✅ Embed video: inline JSON object")
+                                return _unescape_url(video_url)
+                        except Exception:
+                            pass
+
+                # ── Scan all JSON-like blobs in the whole HTML ───────────────
+                # Some Instagram embed pages put GQL data in a single large block
+                json_blobs = re.findall(r'(\{"(?:shortcode_media|media|gql_data)[^<]{20,})', html)
+                for blob in json_blobs:
+                    # Trim to a balanced JSON object
+                    depth_c = 0
+                    end_idx = 0
+                    for i, ch in enumerate(blob):
+                        if ch == '{':
+                            depth_c += 1
+                        elif ch == '}':
+                            depth_c -= 1
+                            if depth_c == 0:
+                                end_idx = i + 1
+                                break
+                    if end_idx:
+                        try:
+                            data = json_lib.loads(blob[:end_idx])
+                            video_url = _find_video_url_in_obj(data)
+                            if video_url:
+                                logger.info("✅ Embed video: GQL blob")
+                                return _unescape_url(video_url)
+                        except Exception:
+                            pass
+
+            except Exception as e:
+                logger.debug(f"   Embed extraction attempt failed ({embed_url}): {e}")
+
+    logger.warning(f"⚠️ Embed video extraction: no video URL found for {shortcode}")
+    return None
+
+
+def download_with_embed_extraction(url, content_type='both'):
+    """
+    Download an Instagram reel/post by extracting the CDN video URL from
+    the public embed page.  Works without any login or cookies for most
+    public content — the same technique used by third-party Instagram
+    downloader sites.
+    """
+    shortcode = _extract_shortcode(url)
+    if not shortcode:
+        return None
+
+    logger.info(f"🔍 Trying embed video extraction for: {shortcode}")
+    video_url = _extract_reel_video_from_embed(shortcode)
+    if video_url:
+        logger.info(f"📥 Downloading via CDN: {video_url[:80]}...")
+        return _download_raw_url(video_url, 'mp4')
+    return None
+
+
+def download_with_instaloader(url, content_type='both'):
+    """
+    Download a public Instagram post using instaloader.
+    instaloader uses Instagram's public mobile API and works without
+    credentials for public accounts.
+    """
+    if not INSTALOADER_AVAILABLE:
+        return None
+    try:
+        shortcode = _extract_shortcode(url)
+        if not shortcode:
+            return None
+
+        logger.info(f"📷 Trying Instaloader for shortcode: {shortcode}")
+
+        L = instaloader.Instaloader(
+            download_videos=True,
+            download_video_thumbnails=False,
+            download_geotags=False,
+            download_comments=False,
+            save_metadata=False,
+            compress_json=False,
+            quiet=True,
+            dirname_pattern=DOWNLOAD_FOLDER,
+            filename_pattern=shortcode,
+            request_timeout=30,
+        )
+
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+
+        if post.is_video:
+            video_url = post.video_url
+            logger.info(f"   Instaloader video URL: {video_url[:80]}...")
+            result = _download_raw_url(video_url, 'mp4')
+            if result:
+                logger.info("✅ Instaloader video download succeeded")
+                return result
+        else:
+            img_url = post.url
+            logger.info(f"   Instaloader image URL: {img_url[:80]}...")
+            result = _download_cdn_image(img_url, shortcode)
+            if result:
+                logger.info("✅ Instaloader image download succeeded")
+                return result
+    except Exception as e:
+        logger.warning(f"⚠️ Instaloader failed: {str(e)[:120]}")
+    return None
+
+
 def try_download_methods(url, format_id, content_type='both'):
     """Try multiple download methods in order of reliability"""
 
@@ -1157,17 +1415,27 @@ def try_download_methods(url, format_id, content_type='both'):
     if YTDLP_AVAILABLE:
         methods.append(('yt-dlp', download_with_ytdlp, [url, format_id, content_type]))
 
-    # Method 2: Dedicated Instagram photo downloader (Instagram API + CDN direct)
+    # Method 2: Embed page video extraction (public, no auth required)
+    # Parses Instagram's own embed page JSON to get the CDN video URL.
+    # This is the primary fallback when yt-dlp is rate-limited.
+    if is_video_url:
+        methods.append(('Embed extraction', download_with_embed_extraction, [url, content_type]))
+
+    # Method 3: Instaloader (public API, no login needed for public content)
+    if INSTALOADER_AVAILABLE:
+        methods.append(('Instaloader', download_with_instaloader, [url, content_type]))
+
+    # Method 4: Dedicated Instagram photo downloader (Instagram API + CDN direct)
     # Skip entirely for definite video-only posts (reels, IGTV) to prevent
     # the photo downloader from returning the cover thumbnail as a "download".
     if not is_video_url:
         methods.append(('Instagram Photo', download_instagram_photo, [url]))
 
-    # Method 3: Instagrapi
+    # Method 5: Instagrapi
     if INSTAGRAPI_AVAILABLE:
         methods.append(('Instagrapi', download_with_instagrapi, [url, content_type]))
 
-    # Method 4: Direct HTTP extraction
+    # Method 6: Direct HTTP extraction
     methods.append(('Direct HTTP', download_direct_http, [url, content_type]))
 
     for method_name, method_func, args in methods:
@@ -2478,15 +2746,25 @@ def download_with_ytdlp(url, format_id='best', content_type='both'):
             'no_warnings':  True,
             'socket_timeout': 90,
             'http_headers': {
-                'User-Agent':      get_random_user_agent(),
+                'User-Agent':      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
                 'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
+                'Referer':         'https://www.instagram.com/',
             },
-            'retries': 2,
+            'retries': 3,
             'skip_unavailable_fragments': True,
+            # Throttle slightly to reduce rate-limiting
+            'sleep_interval': 1,
+            'max_sleep_interval': 3,
         }
+
+        # Use Instagram-specific cookies (Netscape format) if available
         if os.path.exists(NETSCAPE_COOKIES_FILE):
             ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
+            logger.info("🍪 yt-dlp: using saved Instagram cookies")
+        # Fallback to generic yt-dlp cookie file
+        elif os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+            ydl_opts['cookiefile'] = YTDLP_COOKIE_FILE_FALLBACK
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -2698,8 +2976,14 @@ def status():
         'status': 'online',
         'yt_dlp': YTDLP_AVAILABLE,
         'instagrapi': INSTAGRAPI_AVAILABLE,
+        'instaloader': INSTALOADER_AVAILABLE,
         'selenium': SELENIUM_AVAILABLE,
-        'methods': [m for m in ['Instagrapi', 'yt-dlp', 'Direct HTTP'] if (m == 'Instagrapi' and INSTAGRAPI_AVAILABLE) or (m == 'yt-dlp' and YTDLP_AVAILABLE) or m == 'Direct HTTP']
+        'methods': [m for m in ['yt-dlp', 'Embed extraction', 'Instaloader', 'Instagrapi', 'Direct HTTP']
+                    if (m == 'yt-dlp' and YTDLP_AVAILABLE)
+                    or m == 'Embed extraction'
+                    or (m == 'Instaloader' and INSTALOADER_AVAILABLE)
+                    or (m == 'Instagrapi' and INSTAGRAPI_AVAILABLE)
+                    or m == 'Direct HTTP']
     })
 
 if __name__ == '__main__':

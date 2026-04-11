@@ -146,7 +146,8 @@ def build_youtube_ydl_overrides(timeout=60):
         # Try multiple YouTube clients; this can reduce bot-check frequency.
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                # Try multiple clients; availability differs by region/IP reputation.
+                'player_client': ['android', 'ios', 'web']
             }
         },
     }
@@ -876,6 +877,39 @@ def extract_preview_info(url):
         except Exception as e:
             logger.warning(f"⚠️ Twitter oEmbed failed: {e}")
 
+    # ── Method 4: Instagram embed fallback (public reels/posts) ──
+    if ('instagram.com/reel/' in url or 'instagram.com/p/' in url) and not preview_data:
+        try:
+            logger.info("🔍 Trying Instagram embed fallback...")
+            clean = url.split('?')[0].split('#')[0].rstrip('/')
+            shortcode = clean.split('/')[-1]
+            kind = 'reel' if '/reel/' in clean else 'p'
+            embed_url = f"https://www.instagram.com/{kind}/{shortcode}/embed/captioned/"
+            headers = {'User-Agent': get_random_user_agent()}
+            resp = requests.get(embed_url, headers=headers, timeout=20)
+            if resp.status_code == 200:
+                html = resp.text
+
+                def _meta_val(prop_name):
+                    m = re.search(rf'<meta\s+property=["\']{prop_name}["\']\s+content=["\']([^"\']+)["\']', html)
+                    if not m:
+                        m = re.search(rf'<meta\s+name=["\']{prop_name}["\']\s+content=["\']([^"\']+)["\']', html)
+                    return m.group(1) if m else ''
+
+                thumb = _meta_val('og:image')
+                title = _meta_val('og:title')
+                desc = _meta_val('og:description')
+
+                if thumb or title or desc:
+                    preview_data['thumbnail'] = thumb
+                    preview_data['title'] = title
+                    preview_data['description'] = desc
+                    preview_data['is_video'] = ('/reel/' in clean)
+                    preview_data['type'] = 'video' if preview_data['is_video'] else 'photo'
+                    logger.info("✅ Instagram embed fallback succeeded")
+        except Exception as e:
+            logger.warning(f"⚠️ Instagram embed preview failed: {e}")
+
     if preview_data:
         return preview_data
 
@@ -1062,6 +1096,9 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
                 'no_warnings':    True,
                 'socket_timeout': timeout,
                 'retries':        3,
+                'http_headers':   {
+                    'User-Agent': get_random_user_agent(),
+                },
             }
             if ydl_overrides:
                 ydl_opts.update(ydl_overrides)

@@ -1266,8 +1266,16 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
             cookie_file = resolve_ytdlp_cookie_file()
             if cookie_file:
                 ydl_opts['cookiefile'] = cookie_file
+            
+            # Properly merge ydl_overrides without losing http_headers
             if ydl_overrides:
+                override_headers = ydl_overrides.pop('http_headers', {})
                 ydl_opts.update(ydl_overrides)
+                # Merge headers (override_headers takes precedence)
+                ydl_opts['http_headers'].update(override_headers)
+                # Re-add http_headers to ydl_overrides for potential later use
+                ydl_overrides['http_headers'] = override_headers
+            
             if merge and FFMPEG_AVAILABLE:
                 ydl_opts['merge_output_format'] = 'mp4'
             if postprocessors and FFMPEG_AVAILABLE:
@@ -1367,10 +1375,15 @@ def _fetch_twitter_syndication_media(url):
         return {}
 
     endpoint = f'https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&lang=en'
-    r = requests.get(endpoint, timeout=15, headers={'User-Agent': get_random_user_agent()})
-    if r.status_code != 200:
+    try:
+        r = requests.get(endpoint, timeout=15, headers={'User-Agent': get_random_user_agent()})
+        if r.status_code != 200:
+            logger.warning(f"⚠️ Syndication endpoint returned {r.status_code}")
+            return {}
+        data = r.json()
+    except Exception as e:
+        logger.warning(f"⚠️ Syndication endpoint error: {e}")
         return {}
-    data = r.json()
 
     media = data.get('mediaDetails') or []
     if not media:
@@ -1384,14 +1397,24 @@ def _fetch_twitter_syndication_media(url):
     video_info = m0.get('video_info') or {}
     variants = video_info.get('variants') or []
     if variants:
+        # Prioritize mp4 variants, then m3u8 (HLS), then other formats
         mp4s = [v for v in variants if (v.get('content_type') or '').startswith('video/mp4') and v.get('url')]
         if mp4s:
             mp4s.sort(key=lambda v: int(v.get('bitrate') or 0), reverse=True)
             media_url = mp4s[0]['url']
             is_video = True
+            logger.info(f"   ✅ Syndication found MP4 video: {media_url[:80]}...")
+        else:
+            # Fallback to m3u8 (HLS) if available
+            m3u8s = [v for v in variants if (v.get('content_type') or '').startswith('application/x-mpegURL') and v.get('url')]
+            if m3u8s:
+                media_url = m3u8s[0]['url']
+                is_video = True
+                logger.info(f"   ✅ Syndication found HLS video: {media_url[:80]}...")
 
     if not media_url and thumb:
         media_url = thumb
+        logger.info(f"   ✅ Syndication found image: {media_url[:80]}...")
 
     return {
         'thumbnail': thumb,
@@ -1403,7 +1426,7 @@ def _fetch_twitter_syndication_media(url):
 
 
 def _fetch_twitter_alt_api_media(url):
-    """Fallback using fxtwitter/vxtwitter public APIs.
+    """Fallback using fxtwitter/vxtwitter public APIs and additional endpoints.
 
     These endpoints often expose media even when the standard extractor fails.
     """
@@ -1414,6 +1437,8 @@ def _fetch_twitter_alt_api_media(url):
     endpoints = [
         f'https://api.fxtwitter.com/status/{tweet_id}',
         f'https://api.vxtwitter.com/status/{tweet_id}',
+        # Additional fallback endpoint
+        f'https://twitter.com/i/api/2/timeline/conversation/{tweet_id}',
     ]
 
     def _pick_media_urls(obj, media):
@@ -1431,9 +1456,9 @@ def _fetch_twitter_alt_api_media(url):
                             media.setdefault('video_url', sv)
                         if 'twimg.com/media' in sv and 'video_url' not in media:
                             media.setdefault('image_url', sv)
-                    if lk in ('text', 'raw_text', 'description') and sv and 'description' not in media:
+                    if lk in ('text', 'raw_text', 'description', 'full_text') and sv and 'description' not in media:
                         media['description'] = sv
-                    if lk in ('name', 'author_name', 'screen_name') and sv and 'title' not in media:
+                    if lk in ('name', 'author_name', 'screen_name', 'author') and sv and 'title' not in media:
                         media['title'] = sv
         elif isinstance(obj, list):
             for x in obj:
@@ -1441,8 +1466,10 @@ def _fetch_twitter_alt_api_media(url):
 
     for ep in endpoints:
         try:
+            logger.info(f"   Trying alt API endpoint: {ep[:60]}...")
             r = requests.get(ep, timeout=15, headers={'User-Agent': get_random_user_agent()})
             if r.status_code != 200:
+                logger.info(f"   → returned {r.status_code}")
                 continue
             data = r.json()
             media = {}
@@ -1451,6 +1478,7 @@ def _fetch_twitter_alt_api_media(url):
                 media_url = media.get('video_url') or media.get('image_url')
                 if media_url and '.m3u8' in media_url.lower() and media.get('thumbnail'):
                     media_url = media.get('thumbnail')
+                logger.info(f"   ✅ Alt API found media: {media_url[:80] if media_url else 'N/A'}...")
                 return {
                     'thumbnail': media.get('thumbnail') or media.get('image_url') or '',
                     'media_url': media_url or '',
@@ -1458,7 +1486,8 @@ def _fetch_twitter_alt_api_media(url):
                     'title': media.get('title', ''),
                     'description': media.get('description', ''),
                 }
-        except Exception:
+        except Exception as e:
+            logger.info(f"   → error: {str(e)[:100]}")
             continue
     return {}
 
@@ -1560,11 +1589,74 @@ def download_generic(url, quality='best'):
         return None
 
 
+def _fetch_twitter_html_scrape_media(url):
+    """Last resort: scrape the tweet HTML page directly for media URLs."""
+    try:
+        logger.info(f"   Trying HTML scrape for Twitter...")
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        r = requests.get(url, headers=headers, timeout=20, allow_redirects=True)
+        if r.status_code != 200:
+            return {}
+        
+        html = r.text
+        media_data = {}
+        
+        # Look for video URLs in JavaScript/JSON embedded in the page
+        import json as json_lib
+        import re as re_lib
+        
+        # Pattern 1: Look for video URLs in initialState or similar JSON
+        patterns = [
+            r'"mediaKey"\s*:\s*"([^"]*)"',
+            r'"video"\s*:\s*\{\s*"variants"\s*:\s*(\[[^\]]+\])',
+            r'"media_url_https"\s*:\s*"([^"]+)"',
+            r'"mp4Url"\s*:\s*"([^"]+)"',
+            r'https://pbs\.twimg\.com/media/[^"\s]+\.mp4',
+            r'https://pbs\.twimg\.com/media/[^"\s]+\?format=',
+        ]
+        
+        for pattern in patterns:
+            match = re_lib.search(pattern, html)
+            if match:
+                url_candidate = match.group(1) if '://' in match.group(1) else match.group(0) if '://' in match.group(0) else None
+                if url_candidate and 'http' in url_candidate:
+                    if '.mp4' in url_candidate:
+                        media_data['video_url'] = url_candidate
+                        logger.info(f"   ✅ HTML scrape found MP4: {url_candidate[:80]}...")
+                        break
+                    elif 'media' in url_candidate or 'pbs.twimg' in url_candidate:
+                        media_data.setdefault('image_url', url_candidate)
+        
+        # Pattern 2: Extract tweet text
+        text_pattern = r'"description"\s*:\s*"([^"\\]*(\\.[^"\\]*)*)"'
+        text_match = re_lib.search(text_pattern, html)
+        if text_match:
+            media_data['description'] = text_match.group(1)
+        
+        if media_data.get('video_url') or media_data.get('image_url'):
+            return {
+                'thumbnail': media_data.get('image_url', ''),
+                'media_url': media_data.get('video_url') or media_data.get('image_url', ''),
+                'is_video': bool(media_data.get('video_url')),
+                'title': '',
+                'description': media_data.get('description', ''),
+            }
+    except Exception as e:
+        logger.info(f"   → HTML scrape error: {str(e)[:100]}")
+    
+    return {}
+
+
 def _download_twitter_via_public_fallbacks(url):
     """Try public metadata APIs and download the discovered media URL."""
     for source_name, fetcher in (
         ('syndication', _fetch_twitter_syndication_media),
         ('alt api', _fetch_twitter_alt_api_media),
+        ('html scrape', _fetch_twitter_html_scrape_media),
     ):
         try:
             data = fetcher(url) or {}
@@ -1580,7 +1672,7 @@ def _download_twitter_via_public_fallbacks(url):
     return None
 
 def download_twitter(url, quality='best'):
-    """Download a Twitter/X video using yt-dlp."""
+    """Download a Twitter/X video using yt-dlp with improved fallback handling."""
     error_text = ''
 
     if YTDLP_AVAILABLE:
@@ -1596,13 +1688,30 @@ def download_twitter(url, quality='best'):
             else:
                 candidates = [fmt, 'best[ext=mp4]/best', 'best']
 
+            # Add Twitter-specific ydl_overrides with better user-agent and settings
+            twitter_overrides = {
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': '*/*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                },
+                'extractor_args': {
+                    'twitter': {
+                        'api': 'graphql'  # Use GraphQL API which is more reliable
+                    }
+                },
+                'socket_timeout': 60,
+                'retries': 5,  # Increased retries for Twitter
+            }
+
             filename, file_size = _download_with_format_fallback(
                 url,
                 os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s'),
                 candidates,
                 timeout=60,
                 merge=(not is_audio),
-                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a'),
+                ydl_overrides=twitter_overrides
             )
             if filename:
                 logger.info(f"✅ Twitter: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")

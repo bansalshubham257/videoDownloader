@@ -996,31 +996,29 @@ def extract_preview_info(url):
 
         if not preview_data.get('thumbnail'):
             try:
-                synd = _fetch_twitter_syndication_media(url)
-                if synd:
-                    preview_data['thumbnail'] = preview_data.get('thumbnail') or synd.get('thumbnail', '')
-                    preview_data['title'] = preview_data.get('title') or synd.get('title', '')
-                    preview_data['description'] = preview_data.get('description') or synd.get('description', '')
-                    if 'is_video' not in preview_data:
-                        preview_data['is_video'] = bool(synd.get('is_video'))
-                    preview_data['type'] = 'video' if preview_data.get('is_video') else preview_data.get('type', 'tweet')
-                    logger.info("✅ Twitter preview improved via syndication")
+                logger.info("🔍 Trying Twitter API for thumbnail...")
+                tweet_id_match = re.search(r'/status/(\d+)', url)
+                if tweet_id_match:
+                    tweet_id = tweet_id_match.group(1)
+                    
+                    # Try syndication API
+                    video_url, thumbnail = _extract_twitter_video_direct(tweet_id)
+                    if thumbnail:
+                        preview_data['thumbnail'] = thumbnail
+                        if not preview_data.get('is_video'):
+                            preview_data['is_video'] = bool(video_url)
+                        logger.info("✅ Twitter thumbnail found via syndication")
+                    
+                    # Try alt API if no thumbnail yet
+                    if not preview_data.get('thumbnail'):
+                        video_url, thumbnail = _extract_twitter_video_alt(tweet_id)
+                        if thumbnail:
+                            preview_data['thumbnail'] = thumbnail
+                            if not preview_data.get('is_video'):
+                                preview_data['is_video'] = bool(video_url)
+                            logger.info("✅ Twitter thumbnail found via alt API")
             except Exception as e:
-                logger.warning(f"⚠️ Twitter syndication preview failed: {e}")
-
-        if not preview_data.get('thumbnail'):
-            try:
-                alt = _fetch_twitter_alt_api_media(url)
-                if alt:
-                    preview_data['thumbnail'] = preview_data.get('thumbnail') or alt.get('thumbnail', '')
-                    preview_data['title'] = preview_data.get('title') or alt.get('title', '')
-                    preview_data['description'] = preview_data.get('description') or alt.get('description', '')
-                    if 'is_video' not in preview_data:
-                        preview_data['is_video'] = bool(alt.get('is_video'))
-                    preview_data['type'] = 'video' if preview_data.get('is_video') else preview_data.get('type', 'tweet')
-                    logger.info("✅ Twitter preview improved via alt API")
-            except Exception as e:
-                logger.warning(f"⚠️ Twitter alt API preview failed: {e}")
+                logger.warning(f"⚠️ Twitter API thumbnail extraction failed: {e}")
 
     # ── Method 4: Instagram embed fallback (public reels/posts) ──
     if ('instagram.com/reel/' in url or 'instagram.com/p/' in url) and not preview_data:
@@ -1375,17 +1373,20 @@ def _extract_twitter_video_direct(tweet_id):
         )
         
         if r.status_code != 200:
-            logger.warning(f"   → Status {r.status_code}")
-            return None
+            logger.debug(f"   → Status {r.status_code}")
+            return None, None
         
         data = r.json()
         media_details = data.get('mediaDetails') or []
         
         if not media_details:
-            logger.info(f"   → No media in response")
-            return None
+            logger.debug(f"   → No media in response")
+            return None, None
         
         first_media = media_details[0]
+        
+        # Get thumbnail
+        thumbnail = first_media.get('media_url_https') or first_media.get('media_url') or ''
         
         # Look for video variants
         video_info = first_media.get('video_info') or {}
@@ -1398,14 +1399,14 @@ def _extract_twitter_video_direct(tweet_id):
             video_url = mp4_variants[0].get('url')
             if video_url:
                 logger.info(f"   ✅ Found MP4 video")
-                return video_url
+                return video_url, thumbnail
         
-        logger.info(f"   → No MP4 video found")
-        return None
+        logger.debug(f"   → No MP4 video found")
+        return None, None
         
     except Exception as e:
-        logger.warning(f"   → Error: {str(e)[:100]}")
-        return None
+        logger.debug(f"   → Error: {str(e)[:100]}")
+        return None, None
 
 
 def _extract_twitter_video_alt(tweet_id):
@@ -1432,62 +1433,50 @@ def _extract_twitter_video_alt(tweet_id):
                 
                 data = r.json()
                 
-                # Handle different response structures
-                # Structure 1: {"tweet": {...}}
-                tweet_data = data.get('tweet')
-                if not tweet_data:
-                    # Structure 2: direct response
-                    tweet_data = data
+                # Aggressively search for MP4 URLs and thumbnails anywhere in response
+                mp4_url = None
+                thumbnail_url = None
                 
-                # Look for media array
-                if isinstance(tweet_data, dict):
-                    media_list = tweet_data.get('media') or []
+                def search_response(obj, depth=0):
+                    nonlocal mp4_url, thumbnail_url
                     
-                    # Try to find MP4 URL in media
-                    for media in media_list:
-                        if isinstance(media, dict):
-                            video_url = media.get('url')
-                            if video_url and '.mp4' in str(video_url):
-                                logger.info(f"   ✅ Found MP4 in media: {str(video_url)[:80]}...")
-                                return str(video_url)
-                
-                # Fallback: recursive search for MP4 URLs anywhere in response
-                def find_mp4_url(obj, depth=0):
                     if depth > 20:  # Prevent infinite recursion
-                        return None
+                        return
                     
                     if isinstance(obj, dict):
                         for k, v in obj.items():
                             if isinstance(v, str):
-                                if 'video.twimg.com' in v and '.mp4' in v:
-                                    return v
+                                # Look for MP4 videos
+                                if not mp4_url and 'video.twimg.com' in v and '.mp4' in v:
+                                    mp4_url = v
+                                    logger.debug(f"      Found MP4: {v[:80]}...")
+                                # Look for thumbnails
+                                if not thumbnail_url and ('pbs.twimg.com' in v or 'twimg.com/media' in v) and any(x in v for x in ['.jpg', '.png', 'format=']):
+                                    thumbnail_url = v
+                                    logger.debug(f"      Found thumbnail: {v[:80]}...")
                             elif isinstance(v, (dict, list)):
-                                result = find_mp4_url(v, depth + 1)
-                                if result:
-                                    return result
+                                search_response(v, depth + 1)
                     elif isinstance(obj, list):
                         for item in obj:
                             if isinstance(item, (dict, list)):
-                                result = find_mp4_url(item, depth + 1)
-                                if result:
-                                    return result
-                    return None
+                                search_response(item, depth + 1)
                 
-                mp4_url = find_mp4_url(data)
+                search_response(data)
+                
                 if mp4_url:
-                    logger.info(f"   ✅ Found MP4 via recursive search: {mp4_url[:80]}...")
-                    return mp4_url
+                    logger.info(f"   ✅ Found MP4 from {endpoint.split('/')[2]}")
+                    return mp4_url, thumbnail_url
                     
             except Exception as e:
                 logger.debug(f"   → Error: {str(e)[:50]}")
                 continue
         
-        logger.info(f"   → No video found in alternative APIs")
-        return None
+        logger.debug(f"   → No video found in alternative APIs")
+        return None, None
         
     except Exception as e:
-        logger.warning(f"   → Alt API error: {str(e)[:100]}")
-        return None
+        logger.debug(f"   → Alt API error: {str(e)[:100]}")
+        return None, None
 
 
 def _extract_tweet_id(url):
@@ -1814,7 +1803,7 @@ def download_twitter(url, quality='best'):
     
     # Step 1: Try direct video extraction via syndication API (most reliable)
     logger.info(f"   → Trying syndication API...")
-    video_url = _extract_twitter_video_direct(tweet_id)
+    video_url, thumbnail = _extract_twitter_video_direct(tweet_id)
     if video_url:
         logger.info(f"   ✅ Found video URL from syndication")
         result = _download_raw_url(video_url, 'mp4')
@@ -1856,7 +1845,7 @@ def download_twitter(url, quality='best'):
     
     # Step 3: Try alternative APIs
     logger.info(f"   → Trying alternative APIs...")
-    alt_video_url = _extract_twitter_video_alt(tweet_id)
+    alt_video_url, alt_thumbnail = _extract_twitter_video_alt(tweet_id)
     if alt_video_url:
         logger.info(f"   ✅ Found video from alternative API")
         result = _download_raw_url(alt_video_url, 'mp4')

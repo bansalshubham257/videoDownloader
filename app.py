@@ -987,8 +987,7 @@ def extract_preview_info(url):
                 if not preview_data.get('description'):
                     preview_data['description'] = tweet_text
                 if 'is_video' not in preview_data:
-                    preview_data['is_video'] = False
-                    preview_data['no_video'] = True   # signal: text-only tweet
+                    preview_data['is_video'] = True  # Assume all Twitter links have video
                 preview_data['type'] = preview_data.get('type', 'tweet')
                 logger.info(f"✅ oEmbed: author={author}, text_len={len(tweet_text)}")
         except Exception as e:

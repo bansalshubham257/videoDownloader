@@ -877,6 +877,20 @@ def extract_preview_info(url):
         except Exception as e:
             logger.warning(f"⚠️ Twitter oEmbed failed: {e}")
 
+        if not preview_data.get('thumbnail'):
+            try:
+                synd = _fetch_twitter_syndication_media(url)
+                if synd:
+                    preview_data['thumbnail'] = preview_data.get('thumbnail') or synd.get('thumbnail', '')
+                    preview_data['title'] = preview_data.get('title') or synd.get('title', '')
+                    preview_data['description'] = preview_data.get('description') or synd.get('description', '')
+                    if 'is_video' not in preview_data:
+                        preview_data['is_video'] = bool(synd.get('is_video'))
+                    preview_data['type'] = 'video' if preview_data.get('is_video') else preview_data.get('type', 'tweet')
+                    logger.info("✅ Twitter preview improved via syndication")
+            except Exception as e:
+                logger.warning(f"⚠️ Twitter syndication preview failed: {e}")
+
     # ── Method 4: Instagram embed fallback (public reels/posts) ──
     if ('instagram.com/reel/' in url or 'instagram.com/p/' in url) and not preview_data:
         try:
@@ -1135,6 +1149,104 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
     return None, None
 
 
+def _extract_direct_media_url_with_ytdlp(url, timeout=60, ydl_overrides=None):
+    """Extract a direct media URL from yt-dlp metadata for fallback downloads."""
+    ydl_opts = {
+        'quiet':          True,
+        'no_warnings':    True,
+        'skip_download':  True,
+        'extract_flat':   False,
+        'socket_timeout': timeout,
+        'http_headers':   {'User-Agent': get_random_user_agent()},
+    }
+    if ydl_overrides:
+        ydl_opts.update(ydl_overrides)
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=False)
+        if not info:
+            return None, None
+
+    requested = info.get('requested_downloads') or []
+    for r in requested:
+        media_url = r.get('url')
+        ext = r.get('ext') or info.get('ext')
+        if media_url:
+            return media_url, ext
+
+    if info.get('url'):
+        return info.get('url'), info.get('ext')
+
+    formats = info.get('formats') or []
+    ranked = []
+    for f in formats:
+        media_url = f.get('url')
+        if not media_url:
+            continue
+        protocol = (f.get('protocol') or '').lower()
+        if protocol.startswith('m3u8'):
+            continue
+        has_video = f.get('vcodec', 'none') not in ('none', None, '')
+        has_audio = f.get('acodec', 'none') not in ('none', None, '')
+        score = (2 if has_video and has_audio else 1 if has_video else 0,
+                 int(f.get('height') or 0),
+                 int(f.get('tbr') or 0))
+        ranked.append((score, media_url, f.get('ext') or info.get('ext')))
+
+    if not ranked:
+        return None, None
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return ranked[0][1], ranked[0][2]
+
+
+def _extract_tweet_id(url):
+    import re
+    m = re.search(r'/status/(\d+)', url)
+    return m.group(1) if m else ''
+
+
+def _fetch_twitter_syndication_media(url):
+    """Fetch tweet media metadata from public syndication endpoint."""
+    tweet_id = _extract_tweet_id(url)
+    if not tweet_id:
+        return {}
+
+    endpoint = f'https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&lang=en'
+    r = requests.get(endpoint, timeout=15, headers={'User-Agent': get_random_user_agent()})
+    if r.status_code != 200:
+        return {}
+    data = r.json()
+
+    media = data.get('mediaDetails') or []
+    if not media:
+        return {}
+
+    m0 = media[0]
+    thumb = m0.get('media_url_https') or m0.get('media_url') or ''
+    media_url = ''
+    is_video = False
+
+    video_info = m0.get('video_info') or {}
+    variants = video_info.get('variants') or []
+    if variants:
+        mp4s = [v for v in variants if (v.get('content_type') or '').startswith('video/mp4') and v.get('url')]
+        if mp4s:
+            mp4s.sort(key=lambda v: int(v.get('bitrate') or 0), reverse=True)
+            media_url = mp4s[0]['url']
+            is_video = True
+
+    if not media_url and thumb:
+        media_url = thumb
+
+    return {
+        'thumbnail': thumb,
+        'media_url': media_url,
+        'is_video': is_video,
+        'title': (data.get('user') or {}).get('name', ''),
+        'description': data.get('text', ''),
+    }
+
+
 def download_tiktok(url, quality='best'):
     """Download a TikTok video using yt-dlp."""
     try:
@@ -1214,6 +1326,13 @@ def download_generic(url, quality='best'):
                 'filename':  os.path.basename(filename),
                 'file_size': f"{file_size/(1024*1024):.2f} MB",
             })
+
+        media_url, ext = _extract_direct_media_url_with_ytdlp(url, timeout=60)
+        if media_url:
+            logger.info(f"🌐 Generic direct URL fallback: {media_url[:90]}...")
+            result = _download_raw_url(media_url, ext or 'mp4')
+            if result:
+                return result
         return None
     except Exception as e:
         err = str(e).lower()
@@ -1257,6 +1376,17 @@ def download_twitter(url, quality='best'):
         return None
     except Exception as e:
         err = str(e).lower()
+        try:
+            synd = _fetch_twitter_syndication_media(url)
+            if synd.get('media_url'):
+                logger.info("🐦 Twitter syndication fallback used")
+                ext = 'mp4' if synd.get('is_video') else 'jpg'
+                result = _download_raw_url(synd['media_url'], ext)
+                if result:
+                    return result
+        except Exception as synd_e:
+            logger.warning(f"⚠️ Twitter syndication fallback failed: {synd_e}")
+
         if 'no video' in err or 'no media' in err or 'does not have' in err:
             return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
         if 'guest token' in err or 'bad guest' in err:
@@ -1416,6 +1546,13 @@ def download_facebook(url, quality='best'):
                 'filename':  os.path.basename(filename),
                 'file_size': f"{file_size/(1024*1024):.2f} MB",
             })
+
+        media_url, ext = _extract_direct_media_url_with_ytdlp(url, timeout=60)
+        if media_url:
+            logger.info("📘 Facebook direct URL fallback used")
+            result = _download_raw_url(media_url, ext or 'mp4')
+            if result:
+                return result
         return None
     except Exception as e:
         err = str(e).lower()

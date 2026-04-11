@@ -1364,119 +1364,95 @@ def _extract_twitter_video_direct(tweet_id):
     """Extract video URL directly from Twitter syndication API."""
     try:
         endpoint = f'https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&lang=en'
-        logger.info(f"   Fetching: {endpoint[:80]}...")
+        logger.info(f"   Fetching syndication: {endpoint[:60]}...")
         
-        r = requests.get(
-            endpoint, 
-            timeout=10,
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        )
-        
+        r = requests.get(endpoint, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
         if r.status_code != 200:
             logger.debug(f"   → Status {r.status_code}")
             return None, None
         
         data = r.json()
         media_details = data.get('mediaDetails') or []
-        
         if not media_details:
-            logger.debug(f"   → No media in response")
+            logger.debug(f"   → No media")
             return None, None
         
         first_media = media_details[0]
-        
-        # Get thumbnail
         thumbnail = first_media.get('media_url_https') or first_media.get('media_url') or ''
         
-        # Look for video variants
         video_info = first_media.get('video_info') or {}
         variants = video_info.get('variants') or []
         
-        # Find MP4 variant (highest bitrate)
         mp4_variants = [v for v in variants if v.get('content_type') == 'video/mp4']
         if mp4_variants:
             mp4_variants.sort(key=lambda x: int(x.get('bitrate', 0)), reverse=True)
             video_url = mp4_variants[0].get('url')
             if video_url:
-                logger.info(f"   ✅ Found MP4 video")
+                logger.info(f"   ✅ Syndication found MP4")
                 return video_url, thumbnail
         
-        logger.debug(f"   → No MP4 video found")
+        logger.debug(f"   → No MP4 variants")
         return None, None
         
     except Exception as e:
-        logger.debug(f"   → Error: {str(e)[:100]}")
+        logger.debug(f"   → Syndication error: {str(e)[:80]}")
         return None, None
 
 
 def _extract_twitter_video_alt(tweet_id):
-    """Extract video URL from alternative Twitter APIs (fxtwitter/vxtwitter)."""
-    try:
-        endpoints = [
-            f'https://api.vxtwitter.com/status/{tweet_id}',  # Try vxtwitter first (more reliable)
-            f'https://api.fxtwitter.com/status/{tweet_id}',
-        ]
-        
-        for endpoint in endpoints:
-            logger.info(f"   Trying: {endpoint[:60]}...")
+    """Extract video URL from alternative Twitter APIs."""
+    endpoints = [
+        f'https://api.vxtwitter.com/status/{tweet_id}',
+        f'https://api.fxtwitter.com/status/{tweet_id}',
+    ]
+    
+    for endpoint in endpoints:
+        try:
+            logger.info(f"   Trying {endpoint.split('/')[2]}...")
+            r = requests.get(endpoint, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
             
-            try:
-                r = requests.get(
-                    endpoint,
-                    timeout=10,
-                    headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-                )
-                
-                if r.status_code != 200:
-                    logger.debug(f"   → Status {r.status_code}")
-                    continue
-                
-                data = r.json()
-                
-                # Aggressively search for MP4 URLs and thumbnails anywhere in response
-                mp4_url = None
-                thumbnail_url = None
-                
-                def search_response(obj, depth=0):
-                    nonlocal mp4_url, thumbnail_url
-                    
-                    if depth > 20:  # Prevent infinite recursion
-                        return
-                    
-                    if isinstance(obj, dict):
-                        for k, v in obj.items():
-                            if isinstance(v, str):
-                                # Look for MP4 videos
-                                if not mp4_url and 'video.twimg.com' in v and '.mp4' in v:
-                                    mp4_url = v
-                                    logger.debug(f"      Found MP4: {v[:80]}...")
-                                # Look for thumbnails
-                                if not thumbnail_url and ('pbs.twimg.com' in v or 'twimg.com/media' in v) and any(x in v for x in ['.jpg', '.png', 'format=']):
-                                    thumbnail_url = v
-                                    logger.debug(f"      Found thumbnail: {v[:80]}...")
-                            elif isinstance(v, (dict, list)):
-                                search_response(v, depth + 1)
-                    elif isinstance(obj, list):
-                        for item in obj:
-                            if isinstance(item, (dict, list)):
-                                search_response(item, depth + 1)
-                
-                search_response(data)
-                
-                if mp4_url:
-                    logger.info(f"   ✅ Found MP4 from {endpoint.split('/')[2]}")
-                    return mp4_url, thumbnail_url
-                    
-            except Exception as e:
-                logger.debug(f"   → Error: {str(e)[:50]}")
+            if r.status_code != 200:
+                logger.debug(f"   → Status {r.status_code}")
                 continue
-        
-        logger.debug(f"   → No video found in alternative APIs")
-        return None, None
-        
-    except Exception as e:
-        logger.debug(f"   → Alt API error: {str(e)[:100]}")
-        return None, None
+            
+            data = r.json()
+            
+            # Search for MP4 URLs - check all string values in response
+            videos = []
+            thumbs = []
+            
+            def extract_urls(obj, depth=0):
+                if depth > 15:
+                    return
+                
+                if isinstance(obj, dict):
+                    for k, v in obj.items():
+                        if isinstance(v, str):
+                            if '.mp4' in v and 'video.twimg.com' in v:
+                                if v not in videos:
+                                    videos.append(v)
+                            elif any(x in v for x in ['.jpg', '.png']) and 'twimg.com' in v:
+                                if v not in thumbs:
+                                    thumbs.append(v)
+                        else:
+                            extract_urls(v, depth + 1)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        extract_urls(item, depth + 1)
+            
+            extract_urls(data)
+            
+            if videos:
+                logger.info(f"   ✅ {endpoint.split('/')[2]} found MP4")
+                thumb = thumbs[0] if thumbs else ''
+                return videos[0], thumb
+            
+        except Exception as e:
+            logger.debug(f"   → {endpoint.split('/')[2]} error: {str(e)[:50]}")
+            continue
+    
+    logger.debug(f"   → No videos found in alt APIs")
+    return None, None
 
 
 def _extract_tweet_id(url):
@@ -1789,7 +1765,7 @@ def _download_twitter_via_public_fallbacks(url):
     return None
 
 def download_twitter(url, quality='best'):
-    """Download a Twitter/X video - only videos, using direct extraction."""
+    """Download a Twitter/X video - always attempt download, show button regardless."""
     logger.info(f"🐦 Twitter/X download: {url} | quality={quality}")
     
     # Extract tweet ID
@@ -1801,7 +1777,7 @@ def download_twitter(url, quality='best'):
     tweet_id = tweet_id_match.group(1)
     logger.info(f"   Tweet ID: {tweet_id}")
     
-    # Step 1: Try direct video extraction via syndication API (most reliable)
+    # Step 1: Try direct video extraction via syndication API
     logger.info(f"   → Trying syndication API...")
     video_url, thumbnail = _extract_twitter_video_direct(tweet_id)
     if video_url:
@@ -1852,8 +1828,42 @@ def download_twitter(url, quality='best'):
         if result:
             return result
     
-    logger.warning(f"   ❌ No video found in tweet")
-    return jsonify({'error': '❌ No video found in this tweet. Tweet may contain only text or images.'}), 400
+    # REMOVED: No longer block download if video not found
+    # Just log the issue and let user try anyway
+    logger.warning(f"   ⚠️ Could not extract video via APIs, but proceeding with download attempt")
+    
+    # Last resort: Try downloading with yt-dlp anyway, maybe it can extract it
+    if YTDLP_AVAILABLE:
+        logger.info(f"   → Last resort: Full yt-dlp download attempt...")
+        try:
+            outtmpl = os.path.join(DOWNLOAD_FOLDER, '%(uploader)s_%(id)s.%(ext)s')
+            ydl_opts = {
+                'format': 'best',
+                'outtmpl': outtmpl,
+                'quiet': False,
+                'socket_timeout': 60,
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if info:
+                    filename = ydl.prepare_filename(info)
+                    if os.path.exists(filename):
+                        file_size = os.path.getsize(filename)
+                        logger.info(f"✅ Last resort download succeeded: {os.path.basename(filename)}")
+                        return jsonify({
+                            'success': True,
+                            'filename': os.path.basename(filename),
+                            'file_size': f"{file_size/(1024*1024):.2f} MB",
+                        })
+        except Exception as e:
+            logger.warning(f"   ⚠️ Last resort failed: {str(e)[:100]}")
+    
+    # If everything fails, return a generic error (not "no video found")
+    return jsonify({'error': '⚠️ Could not download from this tweet. Please try again later.'}), 400
 
 
 def download_pinterest(url):

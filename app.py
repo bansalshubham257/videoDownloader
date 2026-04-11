@@ -984,6 +984,20 @@ def extract_preview_info(url):
             except Exception as e:
                 logger.warning(f"⚠️ Twitter syndication preview failed: {e}")
 
+        if not preview_data.get('thumbnail'):
+            try:
+                alt = _fetch_twitter_alt_api_media(url)
+                if alt:
+                    preview_data['thumbnail'] = preview_data.get('thumbnail') or alt.get('thumbnail', '')
+                    preview_data['title'] = preview_data.get('title') or alt.get('title', '')
+                    preview_data['description'] = preview_data.get('description') or alt.get('description', '')
+                    if 'is_video' not in preview_data:
+                        preview_data['is_video'] = bool(alt.get('is_video'))
+                    preview_data['type'] = 'video' if preview_data.get('is_video') else preview_data.get('type', 'tweet')
+                    logger.info("✅ Twitter preview improved via alt API")
+            except Exception as e:
+                logger.warning(f"⚠️ Twitter alt API preview failed: {e}")
+
     # ── Method 4: Instagram embed fallback (public reels/posts) ──
     if ('instagram.com/reel/' in url or 'instagram.com/p/' in url) and not preview_data:
         try:
@@ -1346,6 +1360,67 @@ def _fetch_twitter_syndication_media(url):
     }
 
 
+def _fetch_twitter_alt_api_media(url):
+    """Fallback using fxtwitter/vxtwitter public APIs.
+
+    These endpoints often expose media even when the standard extractor fails.
+    """
+    tweet_id = _extract_tweet_id(url)
+    if not tweet_id:
+        return {}
+
+    endpoints = [
+        f'https://api.fxtwitter.com/status/{tweet_id}',
+        f'https://api.vxtwitter.com/status/{tweet_id}',
+    ]
+
+    def _pick_media_urls(obj, media):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                lk = k.lower()
+                if isinstance(v, (dict, list)):
+                    _pick_media_urls(v, media)
+                elif isinstance(v, str):
+                    sv = v.strip()
+                    if sv.startswith('http'):
+                        if 'twimg.com/media' in sv and any(sv.lower().endswith(x) or x in sv.lower() for x in ('.jpg', '.jpeg', '.png', '.webp', '?format=')):
+                            media.setdefault('thumbnail', sv)
+                        if '.mp4' in sv or '.m3u8' in sv:
+                            media.setdefault('video_url', sv)
+                        if 'twimg.com/media' in sv and 'video_url' not in media:
+                            media.setdefault('image_url', sv)
+                    if lk in ('text', 'raw_text', 'description') and sv and 'description' not in media:
+                        media['description'] = sv
+                    if lk in ('name', 'author_name', 'screen_name') and sv and 'title' not in media:
+                        media['title'] = sv
+        elif isinstance(obj, list):
+            for x in obj:
+                _pick_media_urls(x, media)
+
+    for ep in endpoints:
+        try:
+            r = requests.get(ep, timeout=15, headers={'User-Agent': get_random_user_agent()})
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            media = {}
+            _pick_media_urls(data, media)
+            if media.get('video_url') or media.get('image_url') or media.get('thumbnail'):
+                media_url = media.get('video_url') or media.get('image_url')
+                if media_url and '.m3u8' in media_url.lower() and media.get('thumbnail'):
+                    media_url = media.get('thumbnail')
+                return {
+                    'thumbnail': media.get('thumbnail') or media.get('image_url') or '',
+                    'media_url': media_url or '',
+                    'is_video': bool(media.get('video_url') and '.mp4' in media.get('video_url', '').lower()),
+                    'title': media.get('title', ''),
+                    'description': media.get('description', ''),
+                }
+        except Exception:
+            continue
+    return {}
+
+
 def download_tiktok(url, quality='best'):
     """Download a TikTok video using yt-dlp."""
     try:
@@ -1486,6 +1561,17 @@ def download_twitter(url, quality='best'):
         except Exception as synd_e:
             logger.warning(f"⚠️ Twitter syndication fallback failed: {synd_e}")
 
+        try:
+            alt = _fetch_twitter_alt_api_media(url)
+            if alt.get('media_url'):
+                logger.info("🐦 Twitter alt API fallback used")
+                ext = 'mp4' if alt.get('is_video') else 'jpg'
+                result = _download_raw_url(alt['media_url'], ext)
+                if result:
+                    return result
+        except Exception as alt_e:
+            logger.warning(f"⚠️ Twitter alt API fallback failed: {alt_e}")
+
         if 'no video' in err or 'no media' in err or 'does not have' in err:
             return jsonify({'error': '📝 This tweet contains text only — there is no video or image to download.'}), 400
         if 'guest token' in err or 'bad guest' in err:
@@ -1623,29 +1709,35 @@ def download_facebook(url, quality='best'):
         is_audio = (quality == 'audio')
         logger.info(f"📘 Facebook download: quality={quality} | fmt={fmt[:50]}")
 
+        # Try simplest playable formats first; on some FB pages high-quality
+        # selectors fail but plain 'best' works without extra merging.
         if is_audio:
-            candidates = [fmt, 'bestaudio/best', 'best']
-        elif FFMPEG_AVAILABLE:
-            candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            format_attempts = ['bestaudio/best', fmt, 'best']
         else:
-            candidates = [fmt, 'best[ext=mp4]/best', 'best']
+            format_attempts = ['best', fmt, 'best[protocol^=http][protocol!*=m3u8]/best']
 
-        filename, file_size = _download_with_format_fallback(
-            url,
-            os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
-            candidates,
-            timeout=60,
-            merge=(not is_audio),
-            scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
-        )
-        if filename:
-            logger.info(f"✅ Facebook: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
-            return jsonify({
-                'success':   True,
-                'filename':  os.path.basename(filename),
-                'file_size': f"{file_size/(1024*1024):.2f} MB",
-            })
+        for single_fmt in format_attempts:
+            try:
+                filename, file_size = _download_with_format_fallback(
+                    url,
+                    os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+                    [single_fmt],
+                    timeout=60,
+                    merge=(not is_audio),
+                    scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+                )
+                if filename:
+                    logger.info(f"✅ Facebook: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    return jsonify({
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    })
+            except Exception as e_single:
+                logger.warning(f"⚠️ Facebook fmt attempt failed ({single_fmt}): {e_single}")
+                continue
 
+        # Final fallback: extract any direct media URL and download raw bytes.
         media_url, ext = _extract_direct_media_url_with_ytdlp(url, timeout=60)
         if media_url:
             logger.info("📘 Facebook direct URL fallback used")

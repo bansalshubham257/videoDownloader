@@ -2519,7 +2519,7 @@
                     📥 Download All
                 </button>
             </div>
-            <div id="carousel-note" style="font-size:13px;color:#888;margin-bottom:12px;display:none;"></div>
+            <div id="carousel-note" style="font-size:14px;color:var(--text-primary);margin-bottom:12px;display:none;padding:12px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);line-height:1.6;"></div>
             <div class="carousel-grid" id="carousel-grid"></div>
         </section>
 
@@ -3248,6 +3248,7 @@
 
     async function loadCarouselItems(url) {
         const isStoryMode = currentPlatform === 'instagram_story';
+        const isAlbumPost = (currentPlatform === 'instagram');
         try {
             const data = await post('/api/carousel', { url });
             if (!data.success) {
@@ -3258,13 +3259,14 @@
                     if (data.needs_cookie)
                         html += ' <button onclick="toggleSettings();document.getElementById(\'settings-panel\').scrollIntoView({behavior:\'smooth\'})" style="margin-left:8px;padding:4px 12px;font-size:12px;background:#3d82f7;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚙️ Login</button>';
                     showMsgHtml(html, 'error');
-                } else if (data.needs_cookie) {
-                    // Subtle note below the single result for album posts
+                } else {
+                    // Album post — show note in the carousel section
                     const note = document.getElementById('carousel-note');
                     if (note) {
-                        note.textContent = '📎 This may be an album post. Add your session cookie in ⚙️ Settings to unlock all items.';
+                        note.innerHTML = data.error || '📸 This post has multiple photos. Add your Instagram session cookie in ⚙️ Settings to download all photos.';
                         note.style.display = 'block';
                         document.getElementById('carousel-section').style.display = 'block';
+                        setTimeout(() => document.getElementById('carousel-section').scrollIntoView({ behavior:'smooth', block:'nearest' }), 150);
                     }
                 }
                 return;
@@ -3277,6 +3279,10 @@
 
             window._carouselItems = data.items;
             const n = data.items.length;
+
+            // Album post — hide the single-result panel (its download button doesn't
+            // cover multi-photo albums; the carousel grid is the right UI).
+            if (isAlbumPost) { hide('single-result'); hideMsg(); }
 
             document.getElementById('carousel-title').innerHTML =
                 `${isStoryMode ? '📖 Story Items' : '📎 Album'} &nbsp;·&nbsp; <span style="color:var(--accent)">${n} items</span>`;

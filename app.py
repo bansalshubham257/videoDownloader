@@ -1200,6 +1200,132 @@ def extract_preview_info(url):
 
 # ── Carousel / Album support ─────────────────────────────────────────────────
 
+def _fetch_carousel_from_page_source(url):
+    """
+    Fetch the Instagram post page HTML and extract all carousel/album media items
+    from the embedded JSON blobs (data-sjs script tags).
+    Works for PUBLIC posts without any authentication/session cookie.
+    Returns list of {index, url, thumbnail, is_video, ext} dicts.
+    """
+    import re
+    import json as _json
+
+    shortcode = _extract_shortcode(url)
+    if not shortcode:
+        return []
+
+    items = []
+    try:
+        post_url = f'https://www.instagram.com/p/{shortcode}/'
+        headers = {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/124.0.0.0 Safari/537.36'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+        }
+        resp = requests.get(post_url, headers=headers, timeout=30)
+        if resp.status_code != 200:
+            logger.warning(f"⚠️ Page source fetch returned {resp.status_code}")
+            return []
+
+        html = resp.text
+
+        # Extract all <script type="application/json"[^>]*> blobs (data-sjs SSR data)
+        json_scripts = re.findall(
+            r'<script type="application/json"[^>]*>(.+?)</script>',
+            html, re.DOTALL
+        )
+
+        def _find_media_root(obj, depth=0):
+            """Recursively find the object containing carousel_media or image_versions2."""
+            if depth > 25:
+                return None
+            if isinstance(obj, dict):
+                # Priority: prefer objects with carousel_media (full album)
+                if 'carousel_media' in obj and isinstance(obj['carousel_media'], list):
+                    return obj
+                # Also match single-item posts
+                if 'image_versions2' in obj and 'media_type' in obj:
+                    return obj
+                for v in obj.values():
+                    result = _find_media_root(v, depth + 1)
+                    if result:
+                        return result
+            elif isinstance(obj, list):
+                for item in obj:
+                    result = _find_media_root(item, depth + 1)
+                    if result:
+                        return result
+            return None
+
+        media_root = None
+        for blob_str in json_scripts:
+            # Quick string-level pre-filter to avoid parsing large irrelevant blobs
+            if 'carousel_media' not in blob_str and 'image_versions2' not in blob_str:
+                continue
+            try:
+                data = _json.loads(blob_str)
+                found = _find_media_root(data)
+                if found:
+                    media_root = found
+                    break
+            except (_json.JSONDecodeError, RecursionError):
+                continue
+
+        if not media_root:
+            logger.warning("⚠️ Could not find media root in page source JSON blobs")
+            return []
+
+        # ── Extract carousel items ───────────────────────────────────────
+        carousel = media_root.get('carousel_media', [])
+        if carousel:
+            for idx, child in enumerate(carousel):
+                child_type = child.get('media_type')
+                thumb_cands = child.get('image_versions2', {}).get('candidates', [])
+                thumb = thumb_cands[0]['url'] if thumb_cands else ''
+                if child_type == 2:  # video
+                    vids = child.get('video_versions', [])
+                    video_url = vids[0]['url'] if vids else ''
+                    if video_url:
+                        items.append({'index': idx, 'url': video_url,
+                                      'thumbnail': thumb, 'is_video': True, 'ext': 'mp4'})
+                    elif thumb:
+                        items.append({'index': idx, 'url': thumb,
+                                      'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
+                else:  # photo
+                    if thumb:
+                        items.append({'index': idx, 'url': thumb,
+                                      'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
+
+        elif media_root.get('media_type') == 2:  # Single video root
+            vids = media_root.get('video_versions', [])
+            if vids:
+                tc = media_root.get('image_versions2', {}).get('candidates', [])
+                items.append({'index': 0, 'url': vids[0]['url'],
+                              'thumbnail': tc[0]['url'] if tc else '',
+                              'is_video': True, 'ext': 'mp4'})
+
+        else:  # Single photo root
+            tc = media_root.get('image_versions2', {}).get('candidates', [])
+            if tc:
+                items.append({'index': 0, 'url': tc[0]['url'],
+                              'thumbnail': tc[0]['url'], 'is_video': False, 'ext': 'jpg'})
+
+        if items:
+            logger.info(f"✅ Carousel: {len(items)} item(s) via page source scraping")
+
+    except Exception as e:
+        logger.warning(f"⚠️ Carousel page source scraping failed: {e}")
+
+    return items
+
+
 def _fetch_carousel_items(url):
     """
     Return all media items in an Instagram carousel (album) post.
@@ -1257,6 +1383,12 @@ def _fetch_carousel_items(url):
         except Exception as e:
             logger.warning(f"⚠️ Carousel internal API failed: {e}")
 
+    # ── Method B2: Page-source scraping (no auth – works for public posts) ──
+    # Instagram embeds full carousel data as JSON in <script data-sjs> tags.
+    items = _fetch_carousel_from_page_source(url)
+    if items:
+        return items
+
     # ── Method B: yt-dlp (extracts carousel as a playlist) ───────────────
     if YTDLP_AVAILABLE:
         try:
@@ -1281,16 +1413,22 @@ def _fetch_carousel_items(url):
 
             if info:
                 entries = info.get('entries') or []
-                if not entries:
-                    # Single item — wrap it
+                is_playlist = info.get('_type') == 'playlist'
+                if not entries and not is_playlist:
+                    # True single-item post — wrap the root info dict
                     entries = [info]
+                # If is_playlist but entries=0 → Instagram blocked without login; skip to next method
                 for idx, entry in enumerate(entries or []):
                     if not entry:
                         continue
                     is_video  = (entry.get('ext') or '') not in ('jpg', 'jpeg', 'png', 'webp')
                     media_url = entry.get('url', '')
-                    thumb     = entry.get('thumbnail', '')
-                    ext       = entry.get('ext') or ('mp4' if is_video else 'jpg')
+                    # For photos yt-dlp may put the best URL in formats[-1]
+                    if not media_url:
+                        fmts = entry.get('formats') or []
+                        media_url = fmts[-1].get('url', '') if fmts else ''
+                    thumb = entry.get('thumbnail', '')
+                    ext   = entry.get('ext') or ('mp4' if is_video else 'jpg')
                     if media_url:
                         items.append({'index': idx, 'url': media_url,
                                       'thumbnail': thumb, 'is_video': is_video, 'ext': ext})
@@ -1299,6 +1437,53 @@ def _fetch_carousel_items(url):
                     return items
         except Exception as e:
             logger.warning(f"⚠️ yt-dlp carousel failed: {e}")
+
+    # ── Method D: Instagrapi with saved session cookie ────────────────────
+    if INSTAGRAPI_AVAILABLE and cookies_are_set():
+        try:
+            saved_cookies = load_cookies()
+            sessionid = saved_cookies.get('sessionid')
+            if sessionid:
+                from instagrapi import Client as IgClient
+                client = IgClient()
+                client.login_by_sessionid(sessionid)
+                try:
+                    media_pk = client.media_pk_from_code(shortcode)
+                except Exception:
+                    media_pk = shortcode_to_media_pk(shortcode)
+                media = client.media_info(media_pk)
+                if media.media_type == 8:  # Album / Carousel
+                    for idx, resource in enumerate(media.resources):
+                        if resource.media_type == 2:  # video
+                            items.append({
+                                'index': idx,
+                                'url': str(resource.video_url),
+                                'thumbnail': str(resource.thumbnail_url) if resource.thumbnail_url else '',
+                                'is_video': True, 'ext': 'mp4',
+                            })
+                        else:  # photo
+                            photo_url = str(resource.thumbnail_url) if resource.thumbnail_url else ''
+                            items.append({
+                                'index': idx,
+                                'url': photo_url,
+                                'thumbnail': photo_url,
+                                'is_video': False, 'ext': 'jpg',
+                            })
+                elif media.media_type == 2:  # Single video
+                    items.append({
+                        'index': 0, 'url': str(media.video_url),
+                        'thumbnail': str(media.thumbnail_url) if media.thumbnail_url else '',
+                        'is_video': True, 'ext': 'mp4',
+                    })
+                elif media.media_type == 1:  # Single photo
+                    photo_url = str(media.thumbnail_url) if media.thumbnail_url else ''
+                    items.append({'index': 0, 'url': photo_url, 'thumbnail': photo_url,
+                                  'is_video': False, 'ext': 'jpg'})
+                if items:
+                    logger.info(f"✅ Carousel: {len(items)} item(s) via Instagrapi")
+                    return items
+        except Exception as e:
+            logger.warning(f"⚠️ Instagrapi carousel failed: {e}")
 
     # ── Method C: Instaloader ─────────────────────────────────────────────
     if INSTALOADER_AVAILABLE:
@@ -1924,10 +2109,10 @@ def get_carousel():
         needs_cookie = not cookies_are_set()
         return jsonify({
             'error': (
-                'Could not fetch album items. '
-                + ('Add your Instagram session cookie in ⚙️ Settings to unlock album downloads.'
-                   if needs_cookie
-                   else 'Instagram may be rate-limiting. Try again in a moment.')
+                '📸 This post has multiple photos. To download all of them, '
+                'add your Instagram session cookie in ⚙️ Settings.'
+                if needs_cookie
+                else 'Could not fetch all album photos. Your session cookie may have expired — try refreshing it in ⚙️ Settings.'
             ),
             'needs_cookie': needs_cookie,
         }), 400
@@ -3128,6 +3313,60 @@ def _unescape_url(url):
             .replace('&amp;', '&')
             .replace('\\u0026', '&')
             .replace('\\/', '/'))
+
+
+def try_download_methods(url, quality='best', content_type='both'):
+    """
+    Try multiple download strategies for an Instagram post/reel/IGTV in order:
+      1. yt-dlp        – handles videos, reels, and (with cookies) carousels
+      2. Instagrapi    – uses saved session cookie; works for photos, videos, albums
+      3. Photo downloader – public embed / oEmbed scrape for single photos
+    Returns a Flask response on success, or a JSON error response on total failure.
+    """
+    is_video_url = '/reel/' in url or '/tv/' in url
+
+    # ── 1. yt-dlp ────────────────────────────────────────────────────────
+    if YTDLP_AVAILABLE:
+        try:
+            result = download_with_ytdlp(url, quality, content_type)
+            if result:
+                logger.info("✅ try_download_methods: succeeded via yt-dlp")
+                return result
+        except Exception as e:
+            logger.warning(f"⚠️ try_download_methods yt-dlp failed: {e}")
+
+    # ── 2. Instagrapi (requires saved session cookie) ────────────────────
+    if INSTAGRAPI_AVAILABLE and cookies_are_set():
+        try:
+            result = download_with_instagrapi(url, content_type)
+            if result:
+                logger.info("✅ try_download_methods: succeeded via Instagrapi")
+                return result
+        except Exception as e:
+            logger.warning(f"⚠️ try_download_methods Instagrapi failed: {e}")
+
+    # ── 3. Photo downloader (public, no auth) ────────────────────────────
+    if not is_video_url:
+        try:
+            result = download_instagram_photo(url)
+            if result:
+                logger.info("✅ try_download_methods: succeeded via photo downloader")
+                return result
+        except Exception as e:
+            logger.warning(f"⚠️ try_download_methods photo downloader failed: {e}")
+
+    logger.error(f"❌ try_download_methods: all methods failed for {url}")
+    needs_cookie = not cookies_are_set()
+    if needs_cookie:
+        return jsonify({
+            'error': (
+                'Could not download. Instagram requires login for this post. '
+                'Add your session cookie in ⚙️ Settings and try again.'
+            )
+        }), 400
+    return jsonify({
+        'error': 'Download failed. Instagram may be rate-limiting — try again in a moment.'
+    }), 400
 
 
 # ── Dedicated photo downloader ───────────────────────────────────────────────

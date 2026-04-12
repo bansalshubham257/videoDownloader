@@ -790,6 +790,107 @@
             margin: 0 auto;
         }
 
+        /* ── Carousel / Album Section ── */
+        #carousel-section {
+            display: none;
+            max-width: 800px;
+            margin: 28px auto 0;
+            padding: 0 16px;
+        }
+        .carousel-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .carousel-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .carousel-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+        }
+        .carousel-item {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .carousel-item-thumb {
+            position: relative;
+            aspect-ratio: 1/1;
+            background: var(--bg-primary);
+            overflow: hidden;
+        }
+        .carousel-item-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .carousel-item-thumb .ci-badge {
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            background: rgba(0,0,0,.65);
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+            letter-spacing: .3px;
+        }
+        .carousel-item-thumb .ci-num {
+            position: absolute;
+            top: 7px;
+            right: 7px;
+            background: rgba(0,0,0,.55);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 20px;
+        }
+        .carousel-item-body { padding: 10px; }
+        .ci-dl-btn {
+            width: 100%;
+            padding: 9px 6px;
+            background: linear-gradient(135deg,#833ab4,#c13584,#fd1d1d);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: opacity .2s;
+        }
+        .ci-dl-btn:hover  { opacity: .88; }
+        .ci-dl-btn:disabled { opacity: .55; cursor: not-allowed; }
+        .ci-dl-btn.dl-done { background: linear-gradient(135deg,#22c55e,#16a34a); }
+        .carousel-dl-all {
+            margin-left: auto;
+            padding: 8px 18px;
+            background: linear-gradient(135deg,#833ab4,#c13584,#fd1d1d);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .carousel-dl-all:hover    { opacity: .88; }
+        .carousel-dl-all:disabled { opacity: .6; cursor: not-allowed; }
+
         .result-title-row {
             display: flex;
             align-items: center;
@@ -1076,6 +1177,10 @@
 
         .dl-btn-wrap button.generic-btn {
             background: linear-gradient(135deg, #666 0%, #444 100%);
+        }
+
+        .dl-btn-wrap button.story-btn {
+            background: linear-gradient(135deg, #c13584 0%, #833ab4 50%, #405de6 100%);
         }
 
         /* Caption/Description */
@@ -2406,6 +2511,18 @@
             </div>
         </section>
 
+        <!-- ── Carousel / Album items ── -->
+        <section id="carousel-section">
+            <div class="carousel-header">
+                <h3 id="carousel-title">📎 Album</h3>
+                <button class="carousel-dl-all" id="carousel-dl-all-btn" onclick="downloadAllCarouselItems()">
+                    📥 Download All
+                </button>
+            </div>
+            <div id="carousel-note" style="font-size:13px;color:#888;margin-bottom:12px;display:none;"></div>
+            <div class="carousel-grid" id="carousel-grid"></div>
+        </section>
+
         <!-- ── Profile / Playlist grid ── -->
         <section id="profile-result" aria-labelledby="pr-title">
             <h2 id="pr-title">@username</h2>
@@ -2572,6 +2689,8 @@
         hideMsg();
         hide('single-result');
         hide('profile-result');
+        document.getElementById('carousel-section').style.display = 'none';
+        window._carouselItems = [];
         document.getElementById('ready-card').style.display = 'none';
 
         try {
@@ -2610,12 +2729,24 @@
             } else if (type === 'post' || type === 'reel') {
                 currentPlatform = 'instagram';
                 await loadSinglePost(url, 'instagram');
+                // Non-blocking: check for carousel/album items
+                loadCarouselItems(url);
+            } else if (type === 'instagram_story') {
+                currentPlatform = 'instagram_story';
+                // Stories: skip single-result panel (would show blank) and go straight to the story items grid
+                showMsg('Loading story items…', 'info');
+                await loadCarouselItems(url);
+            } else if (type === 'facebook_story') {
+                currentPlatform = 'facebook';
+                await loadSinglePost(url, 'facebook');
             } else if (type === 'generic') {
                 // generic_video — any URL yt-dlp might support (Vimeo, Twitch, Reddit, etc.)
                 currentPlatform = 'generic';
                 await loadSinglePost(url, 'generic');
             } else {
-                showMsg('⚠️ Unknown URL type. Please paste a valid link from a supported website.', 'error');
+                // Unknown URL — attempt a generic download anyway instead of blocking
+                currentPlatform = 'generic';
+                await loadSinglePost(url, 'generic');
             }
         } catch(e) {
             showMsg('Error: ' + e.message, 'error');
@@ -2866,15 +2997,16 @@
         twOpts.classList.remove('show');
         fbOpts.classList.remove('show');
         tkOpts.classList.remove('show');
-        dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn', 'generic-btn');
+        dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn', 'generic-btn', 'story-btn');
 
-        if      (platform === 'youtube')   { ytOpts.classList.add('show'); dlBtn.classList.add('yt-btn'); }
-        else if (platform === 'twitter')   { twOpts.classList.add('show'); dlBtn.classList.add('tw-btn'); }
-        else if (platform === 'facebook')  { fbOpts.classList.add('show'); dlBtn.classList.add('fb-btn'); }
-        else if (platform === 'tiktok')    { tkOpts.classList.add('show'); dlBtn.classList.add('tk-btn'); }
-        else if (platform === 'pinterest') { dlBtn.classList.add('pi-btn'); }
-        else if (platform === 'generic')   { dlBtn.classList.add('generic-btn'); }  // any other site
-        else                               { igOpts.style.display = 'flex'; }
+        if      (platform === 'youtube')        { ytOpts.classList.add('show'); dlBtn.classList.add('yt-btn'); }
+        else if (platform === 'twitter')        { twOpts.classList.add('show'); dlBtn.classList.add('tw-btn'); }
+        else if (platform === 'facebook')       { fbOpts.classList.add('show'); dlBtn.classList.add('fb-btn'); }
+        else if (platform === 'tiktok')         { tkOpts.classList.add('show'); dlBtn.classList.add('tk-btn'); }
+        else if (platform === 'pinterest')      { dlBtn.classList.add('pi-btn'); }
+        else if (platform === 'generic')        { dlBtn.classList.add('generic-btn'); }
+        else if (platform === 'instagram_story'){ dlBtn.classList.add('story-btn'); }   // stories & highlights
+        else                                    { igOpts.style.display = 'flex'; }
 
         try {
             const data = await post('/api/preview', { url });
@@ -2903,7 +3035,7 @@
             thumbWrap.classList.add(
                 (currentPlatform === 'youtube' || currentPlatform === 'twitter' || currentPlatform === 'facebook' || currentPlatform === 'generic')
                 ? 'ratio-16-9'
-                : currentPlatform === 'tiktok'
+                : (currentPlatform === 'tiktok' || currentPlatform === 'instagram_story')
                 ? 'ratio-9-16'
                 : 'ratio-1-1'
             );
@@ -2951,12 +3083,13 @@
         document.getElementById('ready-card').style.display = 'none';
         hideMsg();
 
-        const body = currentPlatform === 'youtube'   ? { url: currentUrl, quality: ytQuality }
-                   : currentPlatform === 'twitter'   ? { url: currentUrl, quality: twQuality }
-                   : currentPlatform === 'facebook'  ? { url: currentUrl, quality: fbQuality }
-                   : currentPlatform === 'tiktok'    ? { url: currentUrl, quality: tkQuality }
-                   : currentPlatform === 'pinterest' ? { url: currentUrl }
-                   : currentPlatform === 'generic'   ? { url: currentUrl }
+        const body = currentPlatform === 'youtube'        ? { url: currentUrl, quality: ytQuality }
+                   : currentPlatform === 'twitter'        ? { url: currentUrl, quality: twQuality }
+                   : currentPlatform === 'facebook'       ? { url: currentUrl, quality: fbQuality }
+                   : currentPlatform === 'tiktok'         ? { url: currentUrl, quality: tkQuality }
+                   : currentPlatform === 'pinterest'      ? { url: currentUrl }
+                   : currentPlatform === 'generic'        ? { url: currentUrl }
+                   : currentPlatform === 'instagram_story'? { url: currentUrl }
                    : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };
 
         try {
@@ -3103,11 +3236,147 @@
         hideMsg();
         hide('single-result');
         hide('profile-result');
+        document.getElementById('carousel-section').style.display = 'none';
+        window._carouselItems = [];
         document.getElementById('ready-card').style.display = 'none';
     }
     document.getElementById('ig-url').addEventListener('input', _syncInputBtns);
-
     document.getElementById('ig-url').addEventListener('keypress',e=>{if(e.key==='Enter')handleSearch();});
+
+    /* ─── CAROUSEL / ALBUM ───────────────────────────────────────────────── */
+    window._carouselItems = [];
+
+    async function loadCarouselItems(url) {
+        const isStoryMode = currentPlatform === 'instagram_story';
+        try {
+            const data = await post('/api/carousel', { url });
+            if (!data.success) {
+                if (isStoryMode) {
+                    // Story was the primary content — surface the error
+                    const errMsg = data.error || 'Could not load story items.';
+                    let html = esc(errMsg);
+                    if (data.needs_cookie)
+                        html += ' <button onclick="toggleSettings();document.getElementById(\'settings-panel\').scrollIntoView({behavior:\'smooth\'})" style="margin-left:8px;padding:4px 12px;font-size:12px;background:#3d82f7;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚙️ Login</button>';
+                    showMsgHtml(html, 'error');
+                } else if (data.needs_cookie) {
+                    // Subtle note below the single result for album posts
+                    const note = document.getElementById('carousel-note');
+                    if (note) {
+                        note.textContent = '📎 This may be an album post. Add your session cookie in ⚙️ Settings to unlock all items.';
+                        note.style.display = 'block';
+                        document.getElementById('carousel-section').style.display = 'block';
+                    }
+                }
+                return;
+            }
+            if (!data.items || (data.items.length <= 1 && !isStoryMode)) return; // single item — no carousel needed (except for stories)
+            if (!data.items || data.items.length === 0) {
+                if (isStoryMode) showMsg('No story items found.', 'error');
+                return;
+            }
+
+            window._carouselItems = data.items;
+            const n = data.items.length;
+
+            document.getElementById('carousel-title').innerHTML =
+                `${isStoryMode ? '📖 Story Items' : '📎 Album'} &nbsp;·&nbsp; <span style="color:var(--accent)">${n} items</span>`;
+            document.getElementById('carousel-note').style.display = 'none';
+
+            document.getElementById('carousel-grid').innerHTML =
+                data.items.map((item, i) => _carouselItemHTML(item, i, n)).join('');
+
+            document.getElementById('carousel-section').style.display = 'block';
+            if (isStoryMode) hideMsg(); // clear the "Loading story items…" message
+            setTimeout(() => document.getElementById('carousel-section').scrollIntoView({ behavior:'smooth', block:'nearest' }), 150);
+        } catch(e) {
+            if (isStoryMode) showMsg('Error loading story: ' + e.message, 'error');
+            // else silently fail — carousel is optional enhancement
+        }
+    }
+
+    function _carouselItemHTML(item, idx, total) {
+        const isVid  = item.is_video;
+        const badge  = isVid ? '📹 Video' : '📸 Photo';
+        const thumb  = item.thumbnail ? thumbUrl(item.thumbnail) : '';
+        const playOv = isVid ? `<div class="play-overlay"><svg viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="40" r="38" fill="rgba(0,0,0,.4)" stroke="rgba(255,255,255,.6)" stroke-width="2"/>
+            <polygon points="32,24 60,40 32,56" fill="white"/></svg></div>` : '';
+        return `
+        <div class="carousel-item">
+            <div class="carousel-item-thumb">
+                ${thumb
+                    ? `<img src="${thumb}" alt="Item ${idx+1}" loading="lazy"
+                            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+                    : ''}
+                <div class="no-thumb" style="display:${thumb?'none':'flex'}">${isVid?'🎬':'📷'}<span>No preview</span></div>
+                ${playOv}
+                <span class="ci-badge">${badge}</span>
+                <span class="ci-num">${idx+1}/${total}</span>
+            </div>
+            <div class="carousel-item-body">
+                <button class="ci-dl-btn" id="ci-btn-${idx}" onclick="downloadCarouselItem(${idx})">
+                    <span id="ci-txt-${idx}">📥 Download</span>
+                    <span class="spin" id="ci-spin-${idx}" style="display:none;"></span>
+                </button>
+            </div>
+        </div>`;
+    }
+
+    async function downloadCarouselItem(idx) {
+        const item = (window._carouselItems || [])[idx];
+        if (!item) return;
+        const btn  = document.getElementById('ci-btn-'  + idx);
+        const txt  = document.getElementById('ci-txt-'  + idx);
+        const spin = document.getElementById('ci-spin-' + idx);
+        if (!btn) return;
+        btn.disabled = true;
+        if (spin) spin.style.display = 'inline-block';
+        if (txt)  txt.textContent    = 'Downloading…';
+        try {
+            const data = await post('/api/download-item', {
+                item_url: item.url,
+                ext:      item.ext || (item.is_video ? 'mp4' : 'jpg'),
+                is_video: item.is_video,
+            });
+            if (data.success) {
+                triggerBrowserDownload(data.filename);
+                addHistory({ filename: data.filename, size: data.file_size, url: item.url, time: new Date().toLocaleString() });
+                btn.classList.add('dl-done');
+                if (txt) txt.textContent = '✅ Saved!';
+                setTimeout(() => {
+                    btn.classList.remove('dl-done');
+                    btn.disabled = false;
+                    if (txt) txt.textContent = '📥 Download';
+                }, 3500);
+            } else {
+                btn.disabled = false;
+                if (txt) txt.textContent = '📥 Download';
+                showMsg(data.error || 'Item download failed', 'error');
+            }
+        } catch(e) {
+            btn.disabled = false;
+            if (txt) txt.textContent = '📥 Download';
+            showMsg('Error: ' + e.message, 'error');
+        } finally {
+            if (spin) spin.style.display = 'none';
+        }
+    }
+
+    async function downloadAllCarouselItems() {
+        const items = window._carouselItems || [];
+        if (!items.length) return;
+        const btn = document.getElementById('carousel-dl-all-btn');
+        btn.disabled = true;
+        btn.textContent = `Downloading 1/${items.length}…`;
+        for (let i = 0; i < items.length; i++) {
+            btn.textContent = `Downloading ${i+1}/${items.length}…`;
+            await downloadCarouselItem(i);
+            await new Promise(r => setTimeout(r, 800));
+        }
+        btn.disabled = false;
+        btn.textContent = '✅ All Downloaded!';
+        setTimeout(() => { btn.textContent = '📥 Download All'; }, 3500);
+    }
 </script>
 </body>
 </html>

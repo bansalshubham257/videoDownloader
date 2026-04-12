@@ -331,6 +331,8 @@ def detect_url_type(url):
 
     # ── Facebook ──────────────────────────────────────────────────────────
     if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
+        if '/stories/' in url or 'story_fbid' in url:
+            return 'facebook_story'
         if ('/watch' in url or '/videos/' in url or '/video/' in url
                 or '/reel/' in url or 'fb.watch' in url or 'video_id' in url):
             return 'facebook_video'
@@ -360,13 +362,18 @@ def detect_url_type(url):
         return 'yt_video'
 
     # ── Instagram ────────────────────────────────────────────────────────
-    if '/reel/' in clean or '/tv/' in clean:
-        return 'reel'
-    if '/p/' in clean:
-        return 'post'
-    if re.search(r'instagram\.com/([A-Za-z0-9_.]+)$', clean) and \
-       not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
-        return 'profile'
+    if 'instagram.com' in url:
+        if '/stories/highlights/' in clean:
+            return 'instagram_story'
+        if '/stories/' in clean:
+            return 'instagram_story'
+        if '/reel/' in clean or '/tv/' in clean:
+            return 'reel'
+        if '/p/' in clean:
+            return 'post'
+        if re.search(r'instagram\.com/([A-Za-z0-9_.]+)$', clean) and \
+           not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
+            return 'profile'
 
     # ── Generic/Unknown website (try with yt-dlp) ────────────────────────
     # If it's a valid URL from an unknown domain, mark it as 'generic'
@@ -1073,8 +1080,879 @@ def extract_preview_info(url):
     if preview_data:
         return preview_data
 
+    # ── Method 5: Instagram Story / Highlight preview ─────────────────────
+    if 'instagram.com' in url and '/stories/' in url:
+        try:
+            logger.info("🔍 Trying Instagram story/highlight preview...")
+            parsed       = _parse_story_url(url)
+            is_highlight = parsed['kind'] == 'highlight'
+
+            # ── 5a: yt-dlp metadata (works without cookies for some highlights) ──
+            if YTDLP_AVAILABLE:
+                try:
+                    ydl_opts = {
+                        'quiet': True, 'no_warnings': True,
+                        'skip_download': True, 'socket_timeout': 15,
+                        'http_headers': {'User-Agent': get_random_user_agent()},
+                    }
+                    if os.path.exists(NETSCAPE_COOKIES_FILE):
+                        ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
+                    elif os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+                        ydl_opts['cookiefile'] = YTDLP_COOKIE_FILE_FALLBACK
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        info = ydl.extract_info(url, download=False)
+                    if info:
+                        entries    = info.get('entries') or []
+                        item_count = len(entries) if entries else 1
+                        thumb      = info.get('thumbnail') or ''
+                        if not thumb and entries:
+                            thumb = (entries[0] or {}).get('thumbnail', '')
+                        preview_data['thumbnail']   = thumb
+                        preview_data['title']       = (info.get('title')
+                                                       or (f'Story Highlight · {item_count} item{"s" if item_count!=1 else ""}'
+                                                           if is_highlight
+                                                           else f"@{parsed.get('username','')}'s Story"))
+                        preview_data['description'] = (info.get('description')
+                                                       or ('Instagram Story Highlight' if is_highlight else 'Instagram Story'))
+                        preview_data['is_video']    = True
+                        preview_data['type']        = 'story_highlight' if is_highlight else 'story'
+                        preview_data['item_count']  = item_count
+                        logger.info(f"✅ yt-dlp story/highlight preview: {item_count} item(s)")
+                except Exception as e:
+                    logger.warning(f"⚠️ yt-dlp story preview failed: {e}")
+
+            # ── 5b: Public endpoint — no auth needed for some highlights ────────
+            if not preview_data.get('thumbnail') and is_highlight and parsed.get('highlight_id'):
+                pub_items = _fetch_highlight_items_public(parsed['highlight_id'])
+                if pub_items:
+                    n = len(pub_items)
+                    preview_data.update({
+                        'thumbnail':   pub_items[0].get('thumbnail', ''),
+                        'is_video':    pub_items[0].get('is_video', True),
+                        'type':        'story_highlight',
+                        'title':       f'Story Highlight · {n} item{"s" if n != 1 else ""}',
+                        'description': f'Instagram story highlight · {n} item{"s" if n != 1 else ""}',
+                        'item_count':  n,
+                    })
+                    logger.info(f"✅ Highlight preview via public endpoint: {n} item(s)")
+
+            # ── 5c: Instagram private API (requires session cookie) ──────────
+            if not preview_data and is_highlight and cookies_are_set():
+                items = _fetch_story_items_from_api(parsed)
+                if items:
+                    first = items[0]
+                    n     = len(items)
+                    preview_data.update({
+                        'thumbnail':   first.get('thumbnail', ''),
+                        'is_video':    first.get('is_video', True),
+                        'type':        'story_highlight',
+                        'title':       f'Story Highlight · {n} item{"s" if n!=1 else ""}',
+                        'description': f'Instagram story highlight · {n} item{"s" if n!=1 else ""}',
+                        'item_count':  n,
+                    })
+                    logger.info("✅ Story highlight preview via private API")
+
+            # ── 5d: Story stub (username only, no auth) ───────────────────────
+            if not preview_data and not is_highlight:
+                username = parsed.get('username') or ''
+                if username:
+                    preview_data.update({
+                        'title':       f"@{username}'s Story",
+                        'description': f'Instagram story by @{username}',
+                        'is_video':    True,
+                        'type':        'story',
+                    })
+                    try:
+                        r = requests.get(
+                            f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
+                            headers=get_session_headers(), timeout=10,
+                        )
+                        if r.status_code == 200:
+                            u   = r.json().get('data', {}).get('user', {})
+                            pic = u.get('profile_pic_url_hd') or u.get('profile_pic_url', '')
+                            if pic:
+                                preview_data['thumbnail'] = pic
+                    except Exception:
+                        pass
+                    logger.info(f"✅ Story stub preview for @{username}")
+
+            # ── 5e: Highlight stub even without cookies ───────────────────────
+            if not preview_data and is_highlight:
+                highlight_id = parsed.get('highlight_id', '')
+                preview_data.update({
+                    'title':       f'Story Highlight #{highlight_id}',
+                    'description': 'Instagram Story Highlight — add session cookie in ⚙️ Settings for thumbnail',
+                    'is_video':    True,
+                    'type':        'story_highlight',
+                    'thumbnail':   '',
+                })
+                logger.info("✅ Story highlight stub (no auth)")
+
+        except Exception as e:
+            logger.warning(f"⚠️ Story preview failed: {e}")
+
+    if preview_data:
+        return preview_data
+
     logger.warning("⚠️ All preview methods failed")
     return None
+
+
+# ── Carousel / Album support ─────────────────────────────────────────────────
+
+def _fetch_carousel_items(url):
+    """
+    Return all media items in an Instagram carousel (album) post.
+    Each item: {index, url, thumbnail, is_video, ext}
+    Falls back gracefully — single-item posts return a 1-element list.
+    """
+    items    = []
+    shortcode = _extract_shortcode(url)
+    if not shortcode:
+        return items
+
+    # ── Method A: Instagram Internal API (requires session cookie) ──────
+    if cookies_are_set():
+        try:
+            media_pk = shortcode_to_media_pk(shortcode)
+            resp = requests.get(
+                f'https://www.instagram.com/api/v1/media/{media_pk}/info/',
+                headers=get_session_headers(), timeout=20,
+            )
+            if resp.status_code == 200:
+                root = (resp.json().get('items') or [{}])[0]
+                media_type = root.get('media_type')
+
+                if media_type == 8:  # Album / Carousel
+                    for idx, child in enumerate(root.get('carousel_media', [])):
+                        child_type = child.get('media_type')
+                        thumb_cands = child.get('image_versions2', {}).get('candidates', [])
+                        thumb = thumb_cands[0]['url'] if thumb_cands else ''
+                        if child_type == 2:  # video
+                            for v in child.get('video_versions', []):
+                                if v.get('url'):
+                                    items.append({'index': idx, 'url': v['url'],
+                                                  'thumbnail': thumb, 'is_video': True, 'ext': 'mp4'})
+                                    break
+                        else:  # photo
+                            if thumb_cands:
+                                items.append({'index': idx, 'url': thumb_cands[0]['url'],
+                                              'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
+                elif media_type == 2:  # Single video
+                    for v in root.get('video_versions', []):
+                        if v.get('url'):
+                            tc = root.get('image_versions2', {}).get('candidates', [])
+                            items.append({'index': 0, 'url': v['url'],
+                                          'thumbnail': tc[0]['url'] if tc else '',
+                                          'is_video': True, 'ext': 'mp4'})
+                            break
+                elif media_type == 1:  # Single photo
+                    tc = root.get('image_versions2', {}).get('candidates', [])
+                    if tc:
+                        items.append({'index': 0, 'url': tc[0]['url'],
+                                      'thumbnail': tc[0]['url'], 'is_video': False, 'ext': 'jpg'})
+                if items:
+                    logger.info(f"✅ Carousel: {len(items)} item(s) via internal API")
+                    return items
+        except Exception as e:
+            logger.warning(f"⚠️ Carousel internal API failed: {e}")
+
+    # ── Method B: yt-dlp (extracts carousel as a playlist) ───────────────
+    if YTDLP_AVAILABLE:
+        try:
+            ydl_opts = {
+                'quiet': True, 'no_warnings': True,
+                'skip_download': True, 'extract_flat': False,
+                'socket_timeout': 30,
+                'http_headers': {
+                    'User-Agent': (
+                        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
+                        'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+                    ),
+                },
+            }
+            if os.path.exists(NETSCAPE_COOKIES_FILE):
+                ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
+            elif os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+                ydl_opts['cookiefile'] = YTDLP_COOKIE_FILE_FALLBACK
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+            if info:
+                entries = info.get('entries') or []
+                if not entries:
+                    # Single item — wrap it
+                    entries = [info]
+                for idx, entry in enumerate(entries or []):
+                    if not entry:
+                        continue
+                    is_video  = (entry.get('ext') or '') not in ('jpg', 'jpeg', 'png', 'webp')
+                    media_url = entry.get('url', '')
+                    thumb     = entry.get('thumbnail', '')
+                    ext       = entry.get('ext') or ('mp4' if is_video else 'jpg')
+                    if media_url:
+                        items.append({'index': idx, 'url': media_url,
+                                      'thumbnail': thumb, 'is_video': is_video, 'ext': ext})
+                if items:
+                    logger.info(f"✅ Carousel: {len(items)} item(s) via yt-dlp")
+                    return items
+        except Exception as e:
+            logger.warning(f"⚠️ yt-dlp carousel failed: {e}")
+
+    # ── Method C: Instaloader ─────────────────────────────────────────────
+    if INSTALOADER_AVAILABLE:
+        try:
+            L = instaloader.Instaloader(
+                download_videos=True, download_video_thumbnails=False,
+                download_geotags=False, download_comments=False,
+                save_metadata=False, quiet=True, request_timeout=30,
+            )
+            post = instaloader.Post.from_shortcode(L.context, shortcode)
+            if post.typename == 'GraphSidecar':
+                for idx, node in enumerate(post.get_sidecar_nodes()):
+                    if node.is_video:
+                        items.append({'index': idx, 'url': node.video_url,
+                                      'thumbnail': node.display_url, 'is_video': True, 'ext': 'mp4'})
+                    else:
+                        items.append({'index': idx, 'url': node.display_url,
+                                      'thumbnail': node.display_url, 'is_video': False, 'ext': 'jpg'})
+            elif post.is_video:
+                items.append({'index': 0, 'url': post.video_url,
+                              'thumbnail': post.url, 'is_video': True, 'ext': 'mp4'})
+            else:
+                items.append({'index': 0, 'url': post.url,
+                              'thumbnail': post.url, 'is_video': False, 'ext': 'jpg'})
+            if items:
+                logger.info(f"✅ Carousel: {len(items)} item(s) via Instaloader")
+                return items
+        except Exception as e:
+            logger.warning(f"⚠️ Instaloader carousel failed: {e}")
+
+    return items
+
+
+# ── Instagram Stories & Highlights ──────────────────────────────────────────
+
+def _parse_story_url(url):
+    """
+    Parse an Instagram story/highlight URL and return a dict:
+      kind         → 'highlight' | 'story' | 'unknown'
+      highlight_id → str or None
+      username     → str or None
+      story_id     → str or None
+    """
+    import re
+    clean = url.split('?')[0].split('#')[0].rstrip('/')
+
+    m = re.search(r'/stories/highlights/(\d+)', clean)
+    if m:
+        return {'kind': 'highlight', 'highlight_id': m.group(1), 'username': None, 'story_id': None}
+
+    m = re.search(r'/stories/([A-Za-z0-9_.]+)/(\d+)', clean)
+    if m:
+        return {'kind': 'story', 'highlight_id': None, 'username': m.group(1), 'story_id': m.group(2)}
+
+    m = re.search(r'/stories/([A-Za-z0-9_.]+)', clean)
+    if m:
+        return {'kind': 'story', 'highlight_id': None, 'username': m.group(1), 'story_id': None}
+
+    return {'kind': 'unknown', 'highlight_id': None, 'username': None, 'story_id': None}
+
+
+def _fetch_story_items_from_api(parsed):
+    """
+    Fetch story/highlight media items via Instagram's private mobile API.
+    Requires a valid session cookie.
+    Returns a list of dicts: {url, thumbnail, is_video, pk}
+    """
+    if not cookies_are_set():
+        return []
+
+    items = []
+    try:
+        mobile_ua = (
+            'Instagram 219.0.0.12.117 Android '
+            '(29/10; 420dpi; 1080x2400; Xiaomi; M2101K6G; garnet; qcom; en_US; 346055813)'
+        )
+        headers = get_session_headers({'User-Agent': mobile_ua})
+
+        if parsed['kind'] == 'highlight':
+            highlight_id = parsed['highlight_id']
+            api_url = (
+                f'https://i.instagram.com/api/v1/feed/reels_media/'
+                f'?reel_ids=highlight:{highlight_id}'
+            )
+            resp = requests.get(api_url, headers=headers, timeout=20)
+            logger.info(f"   Highlights API status: {resp.status_code}")
+            if resp.status_code == 200:
+                data = resp.json()
+                reels    = data.get('reels') or data.get('reels_media') or {}
+                reel_key = f'highlight:{highlight_id}'
+                reel     = reels.get(reel_key) or (list(reels.values())[0] if reels else {})
+                for item in reel.get('items', []):
+                    is_video = item.get('media_type') == 2
+                    media_url = ''
+                    if is_video:
+                        for v in item.get('video_versions', []):
+                            if v.get('url'):
+                                media_url = v['url']
+                                break
+                    else:
+                        cands = item.get('image_versions2', {}).get('candidates', [])
+                        if cands:
+                            media_url = cands[0]['url']
+                    thumb_cands = item.get('image_versions2', {}).get('candidates', [])
+                    thumb = thumb_cands[0]['url'] if thumb_cands else ''
+                    if media_url:
+                        items.append({'url': media_url, 'thumbnail': thumb,
+                                      'is_video': is_video, 'pk': str(item.get('pk', ''))})
+
+        else:  # kind == 'story'
+            username = parsed.get('username')
+            story_id = parsed.get('story_id')
+            if not username:
+                return []
+
+            user_resp = requests.get(
+                f'https://www.instagram.com/api/v1/users/web_profile_info/?username={username}',
+                headers=get_session_headers(), timeout=20,
+            )
+            if user_resp.status_code != 200:
+                return []
+            user_id = user_resp.json().get('data', {}).get('user', {}).get('id')
+            if not user_id:
+                return []
+
+            api_url = f'https://i.instagram.com/api/v1/feed/reels_media/?reel_ids={user_id}'
+            resp    = requests.get(api_url, headers=headers, timeout=20)
+            logger.info(f"   Story feed API status: {resp.status_code}")
+            if resp.status_code == 200:
+                data  = resp.json()
+                reels = data.get('reels') or data.get('reels_media') or {}
+                reel  = reels.get(str(user_id)) or (list(reels.values())[0] if reels else {})
+                for item in reel.get('items', []):
+                    if story_id and str(item.get('pk', '')) != str(story_id):
+                        continue
+                    is_video  = item.get('media_type') == 2
+                    media_url = ''
+                    if is_video:
+                        for v in item.get('video_versions', []):
+                            if v.get('url'):
+                                media_url = v['url']
+                                break
+                    else:
+                        cands = item.get('image_versions2', {}).get('candidates', [])
+                        if cands:
+                            media_url = cands[0]['url']
+                    thumb_cands = item.get('image_versions2', {}).get('candidates', [])
+                    thumb = thumb_cands[0]['url'] if thumb_cands else ''
+                    if media_url:
+                        items.append({'url': media_url, 'thumbnail': thumb,
+                                      'is_video': is_video, 'pk': str(item.get('pk', ''))})
+
+    except Exception as e:
+        logger.warning(f"⚠️ Story API fetch failed: {e}")
+    return items
+
+
+def download_instagram_story(url):
+    """
+    Download Instagram Stories or Story Highlights (first item only).
+    All items are shown on-screen via /api/carousel for individual download.
+    Never creates a ZIP.
+
+    Method order:
+      1. yt-dlp (with cookies if available)
+      2. Instagram private API (requires session cookie)
+      3. Instaloader
+      4. Instagrapi
+    """
+    logger.info(f"📖 Story/Highlight download: {url}")
+    parsed       = _parse_story_url(url)
+    is_highlight = parsed['kind'] == 'highlight'
+
+    # ── Method 1: yt-dlp ────────────────────────────────────────────────
+    if YTDLP_AVAILABLE:
+        try:
+            logger.info("   🔄 yt-dlp story/highlight (first item only)...")
+            ydl_opts = {
+                'format':         'best[ext=mp4]/best',
+                'outtmpl':        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+                'quiet':          True, 'no_warnings': True,
+                'socket_timeout': 60,  'retries': 3,
+                'playlistend':    1,   # download only the first item
+                'http_headers': {
+                    'User-Agent': (
+                        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) '
+                        'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+                    ),
+                    'Referer': 'https://www.instagram.com/',
+                },
+            }
+            if os.path.exists(NETSCAPE_COOKIES_FILE):
+                ydl_opts['cookiefile'] = NETSCAPE_COOKIES_FILE
+            elif os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+                ydl_opts['cookiefile'] = YTDLP_COOKIE_FILE_FALLBACK
+
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+            if info:
+                entries  = info.get('entries') or []
+                entry    = entries[0] if entries else info
+                filename = ydl.prepare_filename(entry)
+                if not os.path.exists(filename):
+                    base = os.path.splitext(filename)[0]
+                    for ext in ('mp4', 'jpg', 'jpeg', 'png', 'webp', 'mkv'):
+                        c = f"{base}.{ext}"
+                        if os.path.exists(c):
+                            filename = c
+                            break
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    logger.info(f"✅ yt-dlp story: {os.path.basename(filename)}")
+                    resp_data = {
+                        'success':   True,
+                        'filename':  os.path.basename(filename),
+                        'file_size': f"{file_size/(1024*1024):.2f} MB",
+                    }
+                    if len(entries) > 1:
+                        resp_data['note'] = (
+                            f'Item 1 of {len(entries)} downloaded. '
+                            'Use the item grid on the page to download the rest.'
+                        )
+                    return jsonify(resp_data)
+        except Exception as e:
+            logger.warning(f"   ⚠️ yt-dlp story failed: {str(e)[:120]}")
+
+    # ── Method 2: Instagram private API (requires cookies) ──────────────
+    api_items = _fetch_story_items_from_api(parsed)
+    if api_items:
+        first  = api_items[0]
+        ext    = 'mp4' if first['is_video'] else 'jpg'
+        result = _download_raw_url(first['url'], ext)
+        if result:
+            total = len(api_items)
+            logger.info(f"✅ Story API: item 1 of {total}")
+            if total > 1:
+                try:
+                    d = result.get_json()
+                    d['note'] = (
+                        f'Item 1 of {total} downloaded. '
+                        'Use the item grid on the page to download the rest.'
+                    )
+                    return jsonify(d)
+                except Exception:
+                    pass
+            return result
+
+    # ── Method 3: Instaloader ────────────────────────────────────────────
+    if INSTALOADER_AVAILABLE:
+        try:
+            logger.info("   🔄 Instaloader story/highlight...")
+            L = instaloader.Instaloader(
+                download_videos=True, download_video_thumbnails=False,
+                download_geotags=False, download_comments=False,
+                save_metadata=False, compress_json=False,
+                quiet=True, dirname_pattern=DOWNLOAD_FOLDER,
+                filename_pattern='{shortcode}', request_timeout=30,
+            )
+            if is_highlight:
+                highlight  = instaloader.Highlight(L.context, int(parsed['highlight_id']))
+                items_list = list(highlight.get_items())
+                if items_list:
+                    first     = items_list[0]
+                    media_url = first.video_url if first.is_video else first.url
+                    result    = _download_raw_url(media_url, 'mp4' if first.is_video else 'jpg')
+                    if result:
+                        logger.info("✅ Instaloader: highlight item 1 downloaded")
+                        return result
+            else:
+                username = parsed.get('username')
+                if username:
+                    profile = instaloader.Profile.from_username(L.context, username)
+                    for story in L.get_stories(userids=[profile.userid]):
+                        for item in story.get_items():
+                            if parsed.get('story_id') and str(item.mediaid) != parsed['story_id']:
+                                continue
+                            media_url = item.video_url if item.is_video else item.url
+                            result    = _download_raw_url(media_url, 'mp4' if item.is_video else 'jpg')
+                            if result:
+                                logger.info("✅ Instaloader: story item downloaded")
+                                return result
+                            break
+        except Exception as e:
+            logger.warning(f"   ⚠️ Instaloader story failed: {str(e)[:120]}")
+
+    # ── Method 4: Instagrapi ─────────────────────────────────────────────
+    if INSTAGRAPI_AVAILABLE:
+        try:
+            logger.info("   🔄 Instagrapi story/highlight...")
+            client = Client()
+            if is_highlight:
+                hinfo = client.highlight_info(int(parsed['highlight_id']))
+                if hinfo.items:
+                    first     = hinfo.items[0]
+                    media_url = str(first.video_url) if first.media_type == 2 else str(first.thumbnail_url)
+                    result    = _download_raw_url(media_url, 'mp4' if first.media_type == 2 else 'jpg')
+                    if result:
+                        logger.info("✅ Instagrapi: highlight item downloaded")
+                        return result
+            elif parsed.get('story_id'):
+                story     = client.story_info(int(parsed['story_id']))
+                media_url = str(story.video_url) if story.media_type == 2 else str(story.thumbnail_url)
+                result    = _download_raw_url(media_url, 'mp4' if story.media_type == 2 else 'jpg')
+                if result:
+                    logger.info("✅ Instagrapi: story item downloaded")
+                    return result
+        except Exception as e:
+            logger.warning(f"   ⚠️ Instagrapi story failed: {str(e)[:120]}")
+
+    needs_cookie = not cookies_are_set()
+    msg = (
+        '📖 Story Highlights require authentication to download. '
+        if is_highlight else
+        '📖 Instagram Stories require authentication to download. '
+    ) + (
+        'Add your Instagram session cookie in ⚙️ Settings and try again.'
+        if needs_cookie else
+        'Your cookie may have expired — update it in ⚙️ Settings.'
+    )
+    return jsonify({'error': msg, 'needs_cookie': needs_cookie}), 400
+
+
+def _fetch_highlight_items_public(highlight_id):
+    """
+    Try to get story highlight items through public Instagram endpoints
+    WITHOUT needing a session cookie.
+
+    Strategies tried:
+      A) i.instagram.com reels_media API with just the app-ID header
+      B) HTML scrape of the highlight page JSON
+    """
+    import re, json as json_lib
+    items = []
+
+    # ── Strategy A: mobile API with app-id header ────────────────────────
+    try:
+        headers = {
+            'User-Agent': (
+                'Mozilla/5.0 (Linux; Android 12; SM-G991B) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/112.0.0.0 Mobile Safari/537.36'
+            ),
+            'x-ig-app-id':    '936619743392459',
+            'Accept':         '*/*',
+            'Accept-Language':'en-US,en;q=0.9',
+        }
+        resp = requests.get(
+            f'https://i.instagram.com/api/v1/feed/reels_media/'
+            f'?reel_ids=highlight:{highlight_id}',
+            headers=headers, timeout=15,
+        )
+        logger.info(f"   Public highlight API (no cookie): {resp.status_code}")
+        if resp.status_code == 200:
+            data     = resp.json()
+            reels    = data.get('reels') or {}
+            reel_key = f'highlight:{highlight_id}'
+            reel     = reels.get(reel_key) or (list(reels.values())[0] if reels else {})
+            for i, item in enumerate(reel.get('items', [])):
+                is_video  = item.get('media_type') == 2
+                media_url = ''
+                if is_video:
+                    for v in item.get('video_versions', []):
+                        if v.get('url'):
+                            media_url = v['url']
+                            break
+                else:
+                    cands = item.get('image_versions2', {}).get('candidates', [])
+                    if cands:
+                        media_url = cands[0]['url']
+                tc    = item.get('image_versions2', {}).get('candidates', [])
+                thumb = tc[0]['url'] if tc else ''
+                if media_url:
+                    items.append({'index': i, 'url': media_url, 'thumbnail': thumb,
+                                  'is_video': is_video,
+                                  'ext': 'mp4' if is_video else 'jpg',
+                                  'pk': str(item.get('pk', ''))})
+            if items:
+                logger.info(f"✅ Public highlight API: {len(items)} item(s)")
+                return items
+    except Exception as e:
+        logger.debug(f"   Public highlight API failed: {e}")
+
+    # ── Strategy B: HTML scrape of the highlight web page ────────────────
+    try:
+        page_url = f'https://www.instagram.com/stories/highlights/{highlight_id}/'
+        headers  = {
+            'User-Agent': (
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+                'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 '
+                'Mobile/15E148 Safari/604.1'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        resp = requests.get(page_url, headers=headers, timeout=20)
+        logger.info(f"   Highlight HTML scrape: {resp.status_code}")
+        if resp.status_code == 200:
+            html = resp.text
+
+            def _find_media(obj, depth=0):
+                if depth > 15 or not obj:
+                    return
+                if isinstance(obj, dict):
+                    # Collect video/image URLs from known keys
+                    is_vid  = obj.get('media_type') == 2 or bool(obj.get('video_url') or obj.get('video_versions'))
+                    vid_url = ''
+                    if obj.get('video_url'):
+                        vid_url = obj['video_url']
+                    elif obj.get('video_versions'):
+                        for v in obj['video_versions']:
+                            if isinstance(v, dict) and v.get('url'):
+                                vid_url = v['url']
+                                break
+                    img_url = ''
+                    cands   = (obj.get('image_versions2') or {}).get('candidates') or []
+                    if cands and isinstance(cands[0], dict):
+                        img_url = cands[0].get('url', '')
+                    if not img_url and obj.get('display_url'):
+                        img_url = obj['display_url']
+
+                    media_url = vid_url or img_url
+                    if media_url and ('fbcdn' in media_url or 'cdninstagram' in media_url or 'instagram' in media_url):
+                        items.append({
+                            'index': len(items),
+                            'url': media_url,
+                            'thumbnail': img_url,
+                            'is_video': bool(vid_url),
+                            'ext': 'mp4' if vid_url else 'jpg',
+                            'pk': str(obj.get('pk', '')),
+                        })
+                        return  # stop descending into this node
+
+                    for v in obj.values():
+                        _find_media(v, depth + 1)
+                elif isinstance(obj, list):
+                    for x in obj:
+                        _find_media(x, depth + 1)
+
+            # Try every JSON blob we can find in the page
+            for m in re.finditer(r'<script[^>]*>(window\.__additionalDataLoaded|window\._sharedData|\{.{50,})</script>', html, re.DOTALL):
+                blob = m.group(1)
+                # Strip leading variable assignment
+                blob = re.sub(r'^window\.\w+\s*=\s*', '', blob).rstrip(';')
+                # For __additionalDataLoaded('..', {...}) strip the call wrapper
+                blob = re.sub(r"^\w+\s*\([^,]*,\s*", '', blob).rstrip(')')
+                try:
+                    data = json_lib.loads(blob)
+                    _find_media(data)
+                    if items:
+                        break
+                except Exception:
+                    pass
+
+    except Exception as e:
+        logger.debug(f"   Highlight HTML scrape failed: {e}")
+
+    if items:
+        logger.info(f"✅ Public HTML scrape: {len(items)} highlight item(s)")
+    return items
+
+
+def _fetch_story_items_ytdlp(url):
+    """
+    Fetch all story/highlight items via yt-dlp metadata (no file download).
+
+    Uses two-phase extraction:
+      Phase 1 — extract_flat='in_playlist'  → enumerate ALL entries quickly
+      Phase 2 — full extraction per entry   → resolve actual CDN media URL
+    Falls back to single-item direct extraction if the URL is not a playlist.
+    """
+    if not YTDLP_AVAILABLE:
+        return []
+    items = []
+
+    def _cookie_opts():
+        o = {}
+        if os.path.exists(NETSCAPE_COOKIES_FILE):
+            o['cookiefile'] = NETSCAPE_COOKIES_FILE
+        elif os.path.exists(YTDLP_COOKIE_FILE_FALLBACK):
+            o['cookiefile'] = YTDLP_COOKIE_FILE_FALLBACK
+        return o
+
+    base = {
+        'quiet': True, 'no_warnings': True,
+        'skip_download': True,
+        'socket_timeout': 30,
+        'http_headers': {'User-Agent': get_random_user_agent()},
+        **_cookie_opts(),
+    }
+
+    # ── Phase 1: enumerate all playlist/highlight entries ────────────────
+    flat_entries = []
+    try:
+        with yt_dlp.YoutubeDL({**base, 'extract_flat': 'in_playlist'}) as ydl:
+            info = ydl.extract_info(url, download=False)
+        if info:
+            flat_entries = [e for e in (info.get('entries') or []) if e]
+            logger.info(f"   yt-dlp flat enumeration: {len(flat_entries)} entry/entries")
+    except Exception as e:
+        logger.warning(f"⚠️ yt-dlp flat enumeration failed: {e}")
+
+    if flat_entries:
+        # ── Phase 2: full extraction per entry ──────────────────────────
+        for idx, entry in enumerate(flat_entries):
+            entry_url = (entry.get('webpage_url')
+                         or entry.get('url')
+                         or (f"https://www.instagram.com/stories/{entry.get('uploader_id','x')}/{entry.get('id','')}/"
+                             if entry.get('id') else ''))
+            if not entry_url:
+                continue
+            try:
+                with yt_dlp.YoutubeDL({**base, 'extract_flat': False}) as ydl:
+                    full = ydl.extract_info(entry_url, download=False)
+                if full and full.get('url'):
+                    is_video = full.get('ext') not in ('jpg', 'jpeg', 'png', 'webp')
+                    items.append({
+                        'index': idx,
+                        'url': full['url'],
+                        'thumbnail': full.get('thumbnail', ''),
+                        'is_video': is_video,
+                        'ext': full.get('ext') or ('mp4' if is_video else 'jpg'),
+                        'pk': str(full.get('id', idx)),
+                    })
+            except Exception as e2:
+                logger.warning(f"   Entry {idx} full extract failed: {e2}")
+                # Soft fallback: use the flat entry thumbnail at least
+                flat_url = entry.get('url', '')
+                if flat_url and not flat_url.startswith('http'):
+                    flat_url = ''
+                if flat_url:
+                    items.append({
+                        'index': idx,
+                        'url': flat_url,
+                        'thumbnail': entry.get('thumbnail', ''),
+                        'is_video': True,
+                        'ext': 'mp4',
+                        'pk': str(entry.get('id', idx)),
+                    })
+    else:
+        # ── Direct single-item fallback ─────────────────────────────────
+        try:
+            with yt_dlp.YoutubeDL({**base, 'extract_flat': False}) as ydl:
+                info = ydl.extract_info(url, download=False)
+            if info:
+                single_entries = info.get('entries') or [info]
+                for idx, entry in enumerate(single_entries):
+                    if not entry:
+                        continue
+                    is_video  = (entry.get('ext') or '') not in ('jpg', 'jpeg', 'png', 'webp')
+                    media_url = entry.get('url', '')
+                    if media_url:
+                        items.append({
+                            'index': idx,
+                            'url': media_url,
+                            'thumbnail': entry.get('thumbnail', ''),
+                            'is_video': is_video,
+                            'ext': entry.get('ext') or ('mp4' if is_video else 'jpg'),
+                            'pk': str(entry.get('id', idx)),
+                        })
+        except Exception as e:
+            logger.warning(f"⚠️ yt-dlp single-item extract failed: {e}")
+
+    if items:
+        logger.info(f"✅ yt-dlp story items total: {len(items)}")
+    return items
+
+
+@app.route('/api/carousel', methods=['POST'])
+def get_carousel():
+    """
+    Return all media items of an Instagram post (carousel/album) or story highlight.
+    Each item: {index, url, thumbnail, is_video, ext}
+    """
+    data = request.json or {}
+    url  = data.get('url', '').strip()
+    if not url or 'instagram.com' not in url:
+        return jsonify({'error': 'Invalid Instagram URL'}), 400
+
+    logger.info(f"🎠 Media items fetch: {url}")
+
+    # ── Story / Highlight path ────────────────────────────────────────────
+    if '/stories/' in url:
+        parsed       = _parse_story_url(url)
+        is_highlight = parsed['kind'] == 'highlight'
+        raw          = []
+
+        # For highlights: try public endpoint first (no cookies needed)
+        if is_highlight and parsed.get('highlight_id'):
+            raw = _fetch_highlight_items_public(parsed['highlight_id'])
+
+        # Then try authenticated API (if cookies set)
+        if not raw:
+            raw = _fetch_story_items_from_api(parsed)
+
+        # Finally try yt-dlp (two-phase playlist extraction)
+        if not raw:
+            raw = _fetch_story_items_ytdlp(url)
+
+        if not raw:
+            needs_cookie = not cookies_are_set()
+            return jsonify({
+                'error': (
+                    'Could not fetch story items. '
+                    + ('Add your Instagram session cookie in ⚙️ Settings to unlock story downloads.'
+                       if needs_cookie
+                       else 'Instagram may be rate-limiting — try again in a moment.')
+                ),
+                'needs_cookie': needs_cookie,
+            }), 400
+
+        items = [
+            {'index': i, 'url': r['url'], 'thumbnail': r.get('thumbnail', ''),
+             'is_video': r.get('is_video', True),
+             'ext': 'mp4' if r.get('is_video', True) else 'jpg'}
+            for i, r in enumerate(raw)
+        ]
+        return jsonify({'success': True, 'items': items, 'count': len(items)})
+
+    # ── Regular carousel / album post ────────────────────────────────────
+    items = _fetch_carousel_items(url)
+
+    if not items:
+        needs_cookie = not cookies_are_set()
+        return jsonify({
+            'error': (
+                'Could not fetch album items. '
+                + ('Add your Instagram session cookie in ⚙️ Settings to unlock album downloads.'
+                   if needs_cookie
+                   else 'Instagram may be rate-limiting. Try again in a moment.')
+            ),
+            'needs_cookie': needs_cookie,
+        }), 400
+
+    return jsonify({'success': True, 'items': items, 'count': len(items)})
+
+
+@app.route('/api/download-item', methods=['POST'])
+def download_item():
+    """Download a single carousel item by its direct CDN URL."""
+    data     = request.json or {}
+    item_url = data.get('item_url', '').strip()
+    ext      = data.get('ext', '').strip().lower()
+    is_video = bool(data.get('is_video', True))
+
+    if not item_url:
+        return jsonify({'error': 'item_url is required'}), 400
+    if ext not in ('mp4', 'jpg', 'jpeg', 'png', 'webp', 'm4a', 'mp3'):
+        ext = 'mp4' if is_video else 'jpg'
+
+    logger.info(f"📦 Download carousel item: {item_url[:80]}... ext={ext}")
+    result = _download_raw_url(item_url, ext)
+    if result:
+        return result
+    return jsonify({'error': 'Could not download this item. The CDN link may have expired — reload the page and try again.'}), 400
 
 
 @app.route('/api/download', methods=['POST'])
@@ -1103,6 +1981,10 @@ def download():
                 return result
             return jsonify({'error': 'TikTok download failed. The video may be private or region-restricted.'}), 400
 
+        # ── Instagram Stories & Highlights ──
+        if 'instagram.com' in url and ('/stories/' in url):
+            return download_instagram_story(url)
+
         # ── Facebook ──
         if 'facebook.com' in url or 'fb.watch' in url or 'fb.com' in url:
             if not YTDLP_AVAILABLE:
@@ -1110,6 +1992,9 @@ def download():
             result = download_facebook(url, quality)
             if result:
                 return result
+            # Give a richer error for stories
+            if '/stories/' in url or 'story_fbid' in url:
+                return jsonify({'error': 'Facebook story download failed. Stories are often private and require login.'}), 400
             return jsonify({'error': 'Facebook download failed. The video may be private or login-protected.'}), 400
 
         # ── Pinterest ──
@@ -1159,312 +2044,6 @@ def download():
         logger.error(f"❌ Download error: {e}", exc_info=True)
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
 
-def _extract_reel_video_from_embed(shortcode):
-    """
-    Deep-parse the Instagram embed page for a video CDN URL.
-    Instagram's embed endpoint is public (no auth required) and embeds
-    the full media JSON inside <script> tags — this is what most working
-    third-party Instagram downloaders rely on.
-    """
-    import re
-    import json as json_lib
-
-    embed_urls = [
-        f"https://www.instagram.com/reel/{shortcode}/embed/captioned/",
-        f"https://www.instagram.com/reel/{shortcode}/embed/",
-        f"https://www.instagram.com/p/{shortcode}/embed/captioned/",
-        f"https://www.instagram.com/p/{shortcode}/embed/",
-    ]
-
-    # Instagram embed pages respond differently for mobile vs desktop user agents.
-    headers_variants = [
-        {
-            'User-Agent': (
-                'Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36'
-            ),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-        },
-        {
-            'User-Agent': (
-                'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
-                'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-            ),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-        },
-        {
-            'User-Agent': (
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-            ),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-        },
-    ]
-
-    def _find_video_url_in_obj(obj, depth=0):
-        """Recursively search any parsed JSON object for a video CDN URL."""
-        if depth > 15:
-            return None
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                if k in ('video_url', 'playback_url', 'browser_native_sd_url',
-                         'browser_native_hd_url', 'dash_abr_playback_url',
-                         'dash_hd_playback_url', 'dash_sd_playback_url') and isinstance(v, str):
-                    if v.startswith('http') and ('fbcdn' in v or 'cdninstagram' in v or 'instagram' in v):
-                        return v
-                result = _find_video_url_in_obj(v, depth + 1)
-                if result:
-                    return result
-        elif isinstance(obj, list):
-            for item in obj:
-                result = _find_video_url_in_obj(item, depth + 1)
-                if result:
-                    return result
-        return None
-
-    for embed_url in embed_urls:
-        for hdrs in headers_variants:
-            try:
-                resp = requests.get(embed_url, headers=hdrs, timeout=20)
-                if resp.status_code != 200:
-                    continue
-
-                html = resp.text
-
-                # ── Quick regex scan for video URLs in the raw HTML ──────────
-                direct_video_patterns = [
-                    # Quoted video_url JSON value pointing to CDN
-                    r'"video_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
-                    r'"video_url"\s*:\s*"(https://[^"]*(?:fbcdn|cdninstagram)[^"]+)"',
-                    r'"playback_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
-                    r'"browser_native_(?:sd|hd)_url"\s*:\s*"(https://[^"]+)"',
-                    # HTML <video src=...>
-                    r'<video[^>]+src="(https://[^"]+\.mp4[^"]*)"',
-                    r'<source[^>]+src="(https://[^"]+\.mp4[^"]*)"',
-                ]
-                for pat in direct_video_patterns:
-                    m = re.search(pat, html, re.IGNORECASE)
-                    if m:
-                        video_url = _unescape_url(m.group(1))
-                        logger.info(f"✅ Embed video extraction: found via direct pattern")
-                        return video_url
-
-                # ── Parse JSON blobs inside <script> tags ────────────────────
-                script_contents = re.findall(
-                    r'<script[^>]*>\s*(window\.__additionalDataLoaded.*?|window\._sharedData.*?|\{.*?)\s*</script>',
-                    html, re.DOTALL
-                )
-                for script_block in script_contents:
-                    # window.__additionalDataLoaded('...', {...})
-                    m = re.search(
-                        r'window\.__additionalDataLoaded\s*\([^,]+,\s*({.+})\s*\)\s*;',
-                        script_block, re.DOTALL
-                    )
-                    if m:
-                        try:
-                            data = json_lib.loads(m.group(1))
-                            video_url = _find_video_url_in_obj(data)
-                            if video_url:
-                                logger.info("✅ Embed video: __additionalDataLoaded JSON")
-                                return _unescape_url(video_url)
-                        except Exception:
-                            pass
-
-                    # window._sharedData = {...};
-                    m = re.search(
-                        r'window\._sharedData\s*=\s*({.+?})\s*;',
-                        script_block, re.DOTALL
-                    )
-                    if m:
-                        try:
-                            data = json_lib.loads(m.group(1))
-                            video_url = _find_video_url_in_obj(data)
-                            if video_url:
-                                logger.info("✅ Embed video: _sharedData JSON")
-                                return _unescape_url(video_url)
-                        except Exception:
-                            pass
-
-                    # Generic JSON object in script
-                    if script_block.strip().startswith('{'):
-                        try:
-                            data = json_lib.loads(script_block.strip())
-                            video_url = _find_video_url_in_obj(data)
-                            if video_url:
-                                logger.info("✅ Embed video: inline JSON object")
-                                return _unescape_url(video_url)
-                        except Exception:
-                            pass
-
-                # ── Scan all JSON-like blobs in the whole HTML ───────────────
-                # Some Instagram embed pages put GQL data in a single large block
-                json_blobs = re.findall(r'(\{"(?:shortcode_media|media|gql_data)[^<]{20,})', html)
-                for blob in json_blobs:
-                    # Trim to a balanced JSON object
-                    depth_c = 0
-                    end_idx = 0
-                    for i, ch in enumerate(blob):
-                        if ch == '{':
-                            depth_c += 1
-                        elif ch == '}':
-                            depth_c -= 1
-                            if depth_c == 0:
-                                end_idx = i + 1
-                                break
-                    if end_idx:
-                        try:
-                            data = json_lib.loads(blob[:end_idx])
-                            video_url = _find_video_url_in_obj(data)
-                            if video_url:
-                                logger.info("✅ Embed video: GQL blob")
-                                return _unescape_url(video_url)
-                        except Exception:
-                            pass
-
-            except Exception as e:
-                logger.debug(f"   Embed extraction attempt failed ({embed_url}): {e}")
-
-    logger.warning(f"⚠️ Embed video extraction: no video URL found for {shortcode}")
-    return None
-
-
-def download_with_embed_extraction(url, content_type='both'):
-    """
-    Download an Instagram reel/post by extracting the CDN video URL from
-    the public embed page.  Works without any login or cookies for most
-    public content — the same technique used by third-party Instagram
-    downloader sites.
-    """
-    shortcode = _extract_shortcode(url)
-    if not shortcode:
-        return None
-
-    logger.info(f"🔍 Trying embed video extraction for: {shortcode}")
-    video_url = _extract_reel_video_from_embed(shortcode)
-    if video_url:
-        logger.info(f"📥 Downloading via CDN: {video_url[:80]}...")
-        return _download_raw_url(video_url, 'mp4')
-    return None
-
-
-def download_with_instaloader(url, content_type='both'):
-    """
-    Download a public Instagram post using instaloader.
-    instaloader uses Instagram's public mobile API and works without
-    credentials for public accounts.
-    """
-    if not INSTALOADER_AVAILABLE:
-        return None
-    try:
-        shortcode = _extract_shortcode(url)
-        if not shortcode:
-            return None
-
-        logger.info(f"📷 Trying Instaloader for shortcode: {shortcode}")
-
-        L = instaloader.Instaloader(
-            download_videos=True,
-            download_video_thumbnails=False,
-            download_geotags=False,
-            download_comments=False,
-            save_metadata=False,
-            compress_json=False,
-            quiet=True,
-            dirname_pattern=DOWNLOAD_FOLDER,
-            filename_pattern=shortcode,
-            request_timeout=30,
-        )
-
-        post = instaloader.Post.from_shortcode(L.context, shortcode)
-
-        if post.is_video:
-            video_url = post.video_url
-            logger.info(f"   Instaloader video URL: {video_url[:80]}...")
-            result = _download_raw_url(video_url, 'mp4')
-            if result:
-                logger.info("✅ Instaloader video download succeeded")
-                return result
-        else:
-            img_url = post.url
-            logger.info(f"   Instaloader image URL: {img_url[:80]}...")
-            result = _download_cdn_image(img_url, shortcode)
-            if result:
-                logger.info("✅ Instaloader image download succeeded")
-                return result
-    except Exception as e:
-        logger.warning(f"⚠️ Instaloader failed: {str(e)[:120]}")
-    return None
-
-
-def try_download_methods(url, format_id, content_type='both'):
-    """Try multiple download methods in order of reliability"""
-
-    # Reels (/reel/) and IGTV (/tv/) are definitively video-only posts.
-    # Never fall back to the photo downloader for them — that would silently
-    # serve the cover thumbnail (a JPG) as the "downloaded file" when yt-dlp
-    # is rate-limited, causing mobile users to download a thumbnail instead
-    # of the actual video.
-    is_video_url = '/reel/' in url or '/tv/' in url
-
-    methods = []
-
-    # Method 1: yt-dlp for videos; automatically falls through to photo handler on "no video"
-    if YTDLP_AVAILABLE:
-        methods.append(('yt-dlp', download_with_ytdlp, [url, format_id, content_type]))
-
-    # Method 2: Embed page video extraction (public, no auth required)
-    # Parses Instagram's own embed page JSON to get the CDN video URL.
-    # This is the primary fallback when yt-dlp is rate-limited.
-    if is_video_url:
-        methods.append(('Embed extraction', download_with_embed_extraction, [url, content_type]))
-
-    # Method 3: Instaloader (public API, no login needed for public content)
-    if INSTALOADER_AVAILABLE:
-        methods.append(('Instaloader', download_with_instaloader, [url, content_type]))
-
-    # Method 4: Dedicated Instagram photo downloader (Instagram API + CDN direct)
-    # Skip entirely for definite video-only posts (reels, IGTV) to prevent
-    # the photo downloader from returning the cover thumbnail as a "download".
-    if not is_video_url:
-        methods.append(('Instagram Photo', download_instagram_photo, [url]))
-
-    # Method 5: Instagrapi
-    if INSTAGRAPI_AVAILABLE:
-        methods.append(('Instagrapi', download_with_instagrapi, [url, content_type]))
-
-    # Method 6: Direct HTTP extraction
-    methods.append(('Direct HTTP', download_direct_http, [url, content_type]))
-
-    for method_name, method_func, args in methods:
-        try:
-            logger.info(f"🔄 Trying: {method_name}")
-            result = method_func(*args)
-            if result and result.status_code == 200:
-                logger.info(f"✅ Success with {method_name}")
-                return result
-        except Exception as e:
-            logger.warning(f"⚠️ {method_name} failed: {str(e)}")
-            continue
-
-    # Give a more specific error for reels so users understand the issue.
-    if is_video_url:
-        return jsonify({
-            'error': (
-                'Instagram is rate-limiting or blocking this reel right now. '
-                'Please try again in a few minutes. '
-                'If it keeps failing, the reel may require login to access.'
-            )
-        }), 400
-
-    return jsonify({
-        'error': 'All download methods failed. Instagram may be blocking this content. Try again in a few minutes.'
-    }), 400
-
-
-# ── YouTube ──────────────────────────────────────────────────────────────────
 
 YT_FORMATS = {
     'best':  'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best[ext=mp4]/best',
@@ -1704,8 +2283,8 @@ def _extract_twitter_video_alt(tweet_id):
                         else:
                             extract_urls(v, depth + 1)
                 elif isinstance(obj, list):
-                    for item in obj:
-                        extract_urls(item, depth + 1)
+                    for x in obj:
+                        extract_urls(x, depth + 1)
             
             extract_urls(data)
             
@@ -1774,7 +2353,7 @@ def _fetch_twitter_syndication_media(url):
 
     if not media_url and thumb:
         media_url = thumb
-        logger.info(f"   ✅ Syndication found image: {media_url[:80]}...")
+        logger.info(f"   ✅ Syndication found image: {media_url[:80]}")
 
     return {
         'thumbnail': thumb,
@@ -1847,7 +2426,7 @@ def _fetch_twitter_alt_api_media(url):
                     'description': media.get('description', ''),
                 }
         except Exception as e:
-            logger.info(f"   → error: {str(e)[:100]}")
+            logger.info(f"   → {ep.split('/')[2]} error: {str(e)[:50]}")
             continue
     return {}
 
@@ -1898,7 +2477,7 @@ def download_generic(url, quality='best'):
     try:
         # Use best MP4 format; fall back to best available
         fmt = {
-            'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+            'best':  'bestvideo[ext=mp4]+bestaudio/best',
             '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
             '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
             '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
@@ -1990,6 +2569,8 @@ def _fetch_twitter_html_scrape_media(url):
                         break
                     elif 'media' in url_candidate or 'pbs.twimg' in url_candidate:
                         media_data.setdefault('image_url', url_candidate)
+                    if media_data.get('image_url') and media_data.get('video_url'):
+                        break
         
         # Pattern 2: Extract tweet text
         text_pattern = r'"description"\s*:\s*"([^"\\]*(\\.[^"\\]*)*)"'
@@ -2221,6 +2802,7 @@ def download_pinterest(url):
             if not dl_info:
                 return None
             filename = ydl.prepare_filename(dl_info)
+            # yt-dlp may change extension; scan for actual file
             if not os.path.exists(filename):
                 base = os.path.splitext(filename)[0]
                 for ext in ('mp4', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'webp', 'mp3', 'm4a'):
@@ -2246,13 +2828,6 @@ def download_pinterest(url):
         return None
 
 
-FACEBOOK_FORMATS = {
-    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
-    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
-    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
-    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
-    'audio': 'bestaudio',
-}
 
 
 def download_facebook(url, quality='best'):

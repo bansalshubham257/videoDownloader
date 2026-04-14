@@ -224,6 +224,54 @@ def load_cookies():
         logger.warning(f"⚠️ Could not load cookies: {e}")
     return {}
 
+
+def _parse_netscape_cookies(filepath):
+    """
+    Parse a Netscape/Mozilla cookies.txt file and return a dict of
+    {name: value} for .instagram.com entries only.
+    """
+    cookies = {}
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    domain = parts[0]
+                    name   = parts[5]
+                    value  = parts[6]
+                    if 'instagram' in domain.lower() and name and value:
+                        cookies[name] = value
+    except Exception:
+        pass
+    return cookies
+
+
+def load_all_ig_cookies():
+    """
+    Return Instagram session cookies from ALL available sources, in priority order:
+      1. /tmp/instagram_cookies.json  (set explicitly by the user via Settings UI)
+      2. /tmp/instagram_cookies.txt   (Netscape file written by save_cookies)
+      3. /tmp/ytdlp_cookies.txt       (bootstrapped from YTDLP_COOKIES_TEXT / YTDLP_COOKIES_B64 env vars)
+      4. YTDLP_COOKIE_FILE env var    (user-supplied cookie file path)
+    """
+    # 1. JSON file (user-set via UI) — highest priority
+    cookies = load_cookies()
+    if cookies.get('sessionid'):
+        return cookies
+
+    # 2. Netscape file written by the UI save flow
+    for path in (NETSCAPE_COOKIES_FILE, YTDLP_COOKIE_FILE_FALLBACK, YTDLP_COOKIE_FILE):
+        if path and os.path.exists(path):
+            nc = _parse_netscape_cookies(path)
+            if nc.get('sessionid'):
+                return nc
+
+    return cookies  # may still be partially populated or empty
+
+
 def save_cookies(cookies: dict):
     """Persist cookies dict to JSON file and regenerate the Netscape txt for yt-dlp."""
     try:
@@ -245,8 +293,8 @@ def _write_netscape_cookies(cookies: dict):
         f.write('\n'.join(lines) + '\n')
 
 def get_session_headers(extra: dict = None):
-    """Build request headers with Instagram session cookies if available."""
-    cookies = load_cookies()
+    """Build request headers with Instagram session cookies if available (all sources)."""
+    cookies = load_all_ig_cookies()
     headers = {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
         'x-ig-app-id': '936619743392459',
@@ -266,8 +314,8 @@ def get_session_headers(extra: dict = None):
     return headers
 
 def cookies_are_set():
-    cookies = load_cookies()
-    return bool(cookies.get('sessionid'))
+    """Return True if a valid Instagram sessionid is available from any cookie source."""
+    return bool(load_all_ig_cookies().get('sessionid'))
 
 
 def normalize_twitter_url(url):
@@ -957,8 +1005,21 @@ def extract_preview_info(url):
     # ── Method 2: HTML scraping (og: meta tags) ──
     try:
         logger.info("🔍 Extracting preview via HTML scraping...")
-        headers = {'User-Agent': get_random_user_agent()}
-        resp = requests.get(url, headers=headers, timeout=20)
+        # Include session cookies (from any available source) so the server IP
+        # is not rate-limited by Instagram and receives full og: meta content.
+        ig_cookies = load_all_ig_cookies()
+        scrape_headers = {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/124.0.0.0 Safari/537.36'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        if ig_cookies:
+            scrape_headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in ig_cookies.items() if v)
+        resp = requests.get(url, headers=scrape_headers, timeout=20)
 
         if resp.status_code == 200:
             html = resp.text
@@ -1217,6 +1278,12 @@ def _fetch_carousel_from_page_source(url):
     items = []
     try:
         post_url = f'https://www.instagram.com/p/{shortcode}/'
+
+        # Use a desktop Chrome UA — Instagram embeds the full JSON payload for desktop.
+        # Also pass any available session cookies so rate-limited server IPs get the data.
+        ig_cookies = load_all_ig_cookies()
+        cookie_str = '; '.join(f"{k}={v}" for k, v in ig_cookies.items() if v) if ig_cookies else ''
+
         headers = {
             'User-Agent': (
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -1229,6 +1296,8 @@ def _fetch_carousel_from_page_source(url):
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
         }
+        if cookie_str:
+            headers['Cookie'] = cookie_str
         resp = requests.get(post_url, headers=headers, timeout=30)
         if resp.status_code != 200:
             logger.warning(f"⚠️ Page source fetch returned {resp.status_code}")
@@ -1280,6 +1349,51 @@ def _fetch_carousel_from_page_source(url):
 
         if not media_root:
             logger.warning("⚠️ Could not find media root in page source JSON blobs")
+            # ── Fallback: Instagram Internal API with available cookies ──
+            # (fires even when cookies come only from the env / yt-dlp bootstrap)
+            if ig_cookies.get('sessionid'):
+                try:
+                    import json as _json2
+                    media_pk = shortcode_to_media_pk(shortcode)
+                    api_resp = requests.get(
+                        f'https://www.instagram.com/api/v1/media/{media_pk}/info/',
+                        headers=get_session_headers(), timeout=20,
+                    )
+                    if api_resp.status_code == 200:
+                        root = (api_resp.json().get('items') or [{}])[0]
+                        media_type = root.get('media_type')
+                        if media_type == 8:  # Album
+                            for idx, child in enumerate(root.get('carousel_media', [])):
+                                ct = child.get('media_type')
+                                tc = child.get('image_versions2', {}).get('candidates', [])
+                                thumb = tc[0]['url'] if tc else ''
+                                if ct == 2:
+                                    for v in child.get('video_versions', []):
+                                        if v.get('url'):
+                                            items.append({'index': idx, 'url': v['url'],
+                                                          'thumbnail': thumb, 'is_video': True, 'ext': 'mp4'})
+                                            break
+                                elif thumb:
+                                    items.append({'index': idx, 'url': thumb,
+                                                  'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
+                        elif media_type == 2:
+                            for v in root.get('video_versions', []):
+                                if v.get('url'):
+                                    tc2 = root.get('image_versions2', {}).get('candidates', [])
+                                    items.append({'index': 0, 'url': v['url'],
+                                                  'thumbnail': tc2[0]['url'] if tc2 else '',
+                                                  'is_video': True, 'ext': 'mp4'})
+                                    break
+                        elif media_type == 1:
+                            tc3 = root.get('image_versions2', {}).get('candidates', [])
+                            if tc3:
+                                items.append({'index': 0, 'url': tc3[0]['url'],
+                                              'thumbnail': tc3[0]['url'], 'is_video': False, 'ext': 'jpg'})
+                        if items:
+                            logger.info(f"✅ Carousel: {len(items)} item(s) via API fallback (env cookies)")
+                            return items
+                except Exception as _api_e:
+                    logger.warning(f"⚠️ Carousel API fallback failed: {_api_e}")
             return []
 
         # ── Extract carousel items ───────────────────────────────────────

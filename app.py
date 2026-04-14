@@ -3512,6 +3512,95 @@ def _fetch_image_from_embed(shortcode):
     return None
 
 
+def _extract_reel_video_from_embed(shortcode):
+    """
+    Try to extract a reel/video CDN URL from Instagram's public embed page.
+    Works without authentication for public posts.
+    Returns a direct MP4 URL string, or None.
+    """
+    import re as _re
+    import json as _json
+
+    for kind in ('reel', 'p'):
+        try:
+            embed_url = f'https://www.instagram.com/{kind}/{shortcode}/embed/captioned/'
+            ig_cookies = load_all_ig_cookies()
+            headers = {
+                'User-Agent': (
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/124.0.0.0 Safari/537.36'
+                ),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': 'https://www.instagram.com/',
+            }
+            if ig_cookies:
+                headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in ig_cookies.items() if v)
+
+            resp = requests.get(embed_url, headers=headers, timeout=20)
+            if resp.status_code != 200:
+                continue
+
+            html = resp.text
+
+            # ── Direct regex patterns for video URLs ──────────────────
+            video_patterns = [
+                r'"video_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
+                r'"playback_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
+                r'"contentUrl"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
+                r'<video[^>]+src="(https://[^"]+)"',
+                r'"dash_manifest"[^"]*"[^"]*"[^"]*"[^"]*"(https://video[^"]+)"',
+                r'(https://video\.cdninstagram\.com[^"\'<\s]+)',
+                r'(https://[^"\'<\s]+video[^"\'<\s]+\.mp4[^"\'<\s]*)',
+            ]
+            for pat in video_patterns:
+                m = _re.search(pat, html)
+                if m:
+                    video_url = _unescape_url(m.group(1))
+                    if video_url:
+                        logger.info(f"✅ Embed reel video URL found via pattern")
+                        return video_url
+
+            # ── Try JSON blobs (data-sjs script tags) ─────────────────
+            blobs = _re.findall(r'<script[^>]*type="application/json"[^>]*>(.+?)</script>', html, _re.DOTALL)
+            for blob_str in blobs:
+                if 'video_url' not in blob_str and 'playback_url' not in blob_str:
+                    continue
+                try:
+                    def _find_video_url(obj, depth=0):
+                        if depth > 20:
+                            return None
+                        if isinstance(obj, dict):
+                            for key in ('video_url', 'playback_url', 'contentUrl'):
+                                v = obj.get(key, '')
+                                if v and isinstance(v, str) and ('mp4' in v or 'video' in v):
+                                    return v
+                            for v in obj.values():
+                                r = _find_video_url(v, depth + 1)
+                                if r:
+                                    return r
+                        elif isinstance(obj, list):
+                            for item in obj:
+                                r = _find_video_url(item, depth + 1)
+                                if r:
+                                    return r
+                        return None
+
+                    data = _json.loads(blob_str)
+                    found = _find_video_url(data)
+                    if found:
+                        logger.info(f"✅ Embed reel video URL found in JSON blob")
+                        return _unescape_url(found)
+                except Exception:
+                    continue
+
+        except Exception as e:
+            logger.warning(f"⚠️ _extract_reel_video_from_embed({kind}) failed: {e}")
+
+    return None
+
+
 def _fetch_oembed_thumbnail(shortcode):
     """
     Use Instagram's public oEmbed API – returns a thumbnail_url (lower-res but reliable).
@@ -3551,9 +3640,11 @@ def try_download_methods(url, quality='best', content_type='both'):
       1. yt-dlp        – handles videos, reels, and (with cookies) carousels
       2. Instagrapi    – uses saved session cookie; works for photos, videos, albums
       3. Photo downloader – public embed / oEmbed scrape for single photos
+      4. Embed video extractor – public embed page scrape for reels (no auth needed)
     Returns a Flask response on success, or a JSON error response on total failure.
     """
     is_video_url = '/reel/' in url or '/tv/' in url
+    shortcode = _extract_shortcode(url)
 
     # ── 1. yt-dlp ────────────────────────────────────────────────────────
     if YTDLP_AVAILABLE:
@@ -3584,6 +3675,19 @@ def try_download_methods(url, quality='best', content_type='both'):
                 return result
         except Exception as e:
             logger.warning(f"⚠️ try_download_methods photo downloader failed: {e}")
+
+    # ── 4. Embed video extractor (public, no auth – works for reels) ─────
+    if shortcode:
+        try:
+            logger.info("🔍 try_download_methods: trying embed video extractor...")
+            video_url = _extract_reel_video_from_embed(shortcode)
+            if video_url:
+                result = _download_raw_url(video_url, 'mp4')
+                if result:
+                    logger.info("✅ try_download_methods: succeeded via embed video extractor")
+                    return result
+        except Exception as e:
+            logger.warning(f"⚠️ try_download_methods embed extractor failed: {e}")
 
     logger.error(f"❌ try_download_methods: all methods failed for {url}")
     needs_cookie = not cookies_are_set()

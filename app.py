@@ -2051,18 +2051,134 @@ def _fetch_story_items_ytdlp(url):
     return items
 
 
+# ── Twitter / X multi-media helpers ─────────────────────────────────────────
+
+def _fetch_twitter_media_items(url):
+    """
+    Return all media items (photos + videos) from a Twitter/X tweet.
+    Uses the public fxtwitter API — no credentials needed.
+    Each item: {index, url, thumbnail, is_video, ext}
+    """
+    import re as _re
+    import json as _json
+
+    m = _re.search(r'/status/(\d+)', url)
+    if not m:
+        return []
+    tweet_id = m.group(1)
+    items = []
+
+    # ── fxtwitter public API (most reliable, ordered media list) ─────────
+    try:
+        api_url = f'https://api.fxtwitter.com/status/{tweet_id}'
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; mediabot/1.0)',
+            'Accept': 'application/json',
+        }
+        resp = requests.get(api_url, headers=headers, timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            tweet = data.get('tweet', {})
+            media_block = tweet.get('media', {})
+            all_items = media_block.get('all', [])
+
+            for idx, item in enumerate(all_items):
+                media_type = item.get('type', '')
+                raw_url = item.get('url', '')
+                if not raw_url:
+                    continue
+
+                if media_type in ('video', 'gif'):
+                    thumb = item.get('thumbnail_url', '')
+                    items.append({
+                        'index': idx,
+                        'url': raw_url,
+                        'thumbnail': thumb,
+                        'is_video': True,
+                        'ext': 'mp4',
+                    })
+                elif media_type == 'photo':
+                    items.append({
+                        'index': idx,
+                        'url': raw_url,
+                        'thumbnail': raw_url,
+                        'is_video': False,
+                        'ext': _re.search(r'\.(png|jpg|jpeg|webp)', raw_url.split('?')[0]) and
+                               _re.search(r'\.(png|jpg|jpeg|webp)', raw_url.split('?')[0]).group(1) or 'jpg',
+                    })
+
+            if items:
+                logger.info(f"✅ Twitter media: {len(items)} item(s) via fxtwitter API")
+                return items
+    except Exception as e:
+        logger.warning(f"⚠️ fxtwitter API failed: {e}")
+
+    # ── Fallback: yt-dlp format extraction ───────────────────────────────
+    if YTDLP_AVAILABLE:
+        try:
+            ydl_opts = {
+                'quiet': True, 'no_warnings': True,
+                'skip_download': True, 'extract_flat': False,
+                'socket_timeout': 20,
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+            if info:
+                entries = info.get('entries') or ([info] if info.get('formats') or info.get('url') else [])
+                for idx, entry in enumerate(entries):
+                    if not entry:
+                        continue
+                    # Prefer best MP4 video format
+                    fmts = entry.get('formats') or []
+                    mp4_fmts = [f for f in fmts if f.get('ext') == 'mp4'
+                                and f.get('vcodec') not in ('none', None, '')]
+                    if mp4_fmts:
+                        mp4_fmts.sort(key=lambda x: int(x.get('height') or 0), reverse=True)
+                        media_url = mp4_fmts[0].get('url', '')
+                    else:
+                        media_url = entry.get('url', '')
+                    thumb = entry.get('thumbnail', '')
+                    if media_url:
+                        is_video = (entry.get('ext') or '') not in ('jpg', 'jpeg', 'png', 'webp')
+                        items.append({'index': idx, 'url': media_url, 'thumbnail': thumb,
+                                      'is_video': is_video,
+                                      'ext': 'mp4' if is_video else 'jpg'})
+                if items:
+                    logger.info(f"✅ Twitter media: {len(items)} item(s) via yt-dlp")
+                    return items
+        except Exception as e:
+            logger.warning(f"⚠️ yt-dlp Twitter media extraction failed: {e}")
+
+    return items
+
+
 @app.route('/api/carousel', methods=['POST'])
 def get_carousel():
     """
-    Return all media items of an Instagram post (carousel/album) or story highlight.
+    Return all media items of an Instagram post/story OR a Twitter/X tweet.
     Each item: {index, url, thumbnail, is_video, ext}
     """
     data = request.json or {}
     url  = data.get('url', '').strip()
-    if not url or 'instagram.com' not in url:
-        return jsonify({'error': 'Invalid Instagram URL'}), 400
+    if not url:
+        return jsonify({'error': 'URL required'}), 400
 
     logger.info(f"🎠 Media items fetch: {url}")
+
+    # ── Twitter / X ───────────────────────────────────────────────────────
+    if 'twitter.com' in url or 'x.com' in url:
+        items = _fetch_twitter_media_items(url)
+        if not items:
+            return jsonify({'error': '⚠️ Could not fetch tweet media. The tweet may have no attachments, or it may be private.'}), 400
+        return jsonify({'success': True, 'items': items, 'count': len(items)})
+
+    if 'instagram.com' not in url:
+        return jsonify({'error': 'Unsupported URL'}), 400
+
 
     # ── Story / Highlight path ────────────────────────────────────────────
     if '/stories/' in url:
@@ -3667,15 +3783,20 @@ def download_direct_http(url, content_type='both'):
 
 
 def _download_raw_url(media_url, ext):
-    """Generic URL → file download with Instagram Referer headers."""
+    """Generic URL → file download with appropriate Referer headers."""
     try:
         cookies = load_cookies()
+        # Use the right Referer so CDN auth checks pass
+        if 'twimg.com' in media_url or 'twitter.com' in media_url or 'x.com' in media_url:
+            referer = 'https://twitter.com/'
+        else:
+            referer = 'https://www.instagram.com/'
         headers = {
             'User-Agent': get_random_user_agent(),
-            'Referer':    'https://www.instagram.com/',
+            'Referer':    referer,
             'Accept':     '*/*',
         }
-        if cookies:
+        if cookies and 'instagram' in referer:
             headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)
 
         resp = requests.get(media_url, headers=headers, timeout=60, stream=True)

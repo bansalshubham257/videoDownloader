@@ -3666,7 +3666,26 @@ def try_download_methods(url, quality='best', content_type='both'):
         except Exception as e:
             logger.warning(f"⚠️ try_download_methods Instagrapi failed: {e}")
 
-    # ── 3. Photo downloader (public, no auth) ────────────────────────────
+    # ── 3. Page-source extraction (public, no auth – works for reels & photos) ──
+    # Scrapes the Instagram post page JSON blobs for direct CDN media URLs.
+    # This is the primary fallback when yt-dlp / Instagrapi fail.
+    if shortcode:
+        try:
+            logger.info("🔍 try_download_methods: trying page-source extraction...")
+            ps_items = _fetch_carousel_from_page_source(url)
+            if ps_items:
+                item = ps_items[0]
+                media_url = item.get('url', '')
+                ext = item.get('ext', 'mp4' if item.get('is_video') else 'jpg')
+                if media_url:
+                    result = _download_raw_url(media_url, ext)
+                    if result:
+                        logger.info("✅ try_download_methods: succeeded via page-source extraction")
+                        return result
+        except Exception as e:
+            logger.warning(f"⚠️ try_download_methods page-source extraction failed: {e}")
+
+    # ── 4. Photo downloader (public, no auth) ────────────────────────────
     if not is_video_url:
         try:
             result = download_instagram_photo(url)

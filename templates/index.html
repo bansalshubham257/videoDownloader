@@ -5,34 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
     <!-- ── Primary SEO ── -->
-    <title>Free Video Downloader — Instagram, TikTok, YouTube, Twitter/X, Facebook & Pinterest</title>
-    <meta name="description" content="Download videos and photos from Instagram, TikTok, YouTube, Twitter/X, Facebook, and Pinterest for free. No watermark, no login required. Supports HD 1080p, 720p, MP3 audio. Fast, free & mobile-friendly.">
-    <meta name="keywords" content="
-        video downloader, free video downloader, online video downloader, social media downloader, video saver,
-        tiktok downloader, tiktok video downloader, tiktok downloader no watermark, save tiktok video, tiktok saver, tiktok mp4 download,
-        instagram downloader, instagram video downloader, instagram reels downloader, instagram photo downloader, instagram story downloader,
-        reels downloader, instagram reels saver, save instagram reels, download instagram reels,
-        youtube downloader, youtube video downloader, youtube shorts downloader, youtube to mp4, youtube to mp3, youtube hd downloader,
-        twitter video downloader, x video downloader, twitter/x downloader, save twitter video, download tweet video,
-        facebook video downloader, facebook reels downloader, fb video downloader, facebook video saver,
-        pinterest downloader, pinterest video downloader, pinterest image downloader,
-        short video downloader, viral video downloader, trending video downloader, mp4 downloader,
-        hd video downloader, 1080p video downloader, audio downloader, mp3 downloader,
-        download videos online, save videos from internet, free media downloader
-    ">
+    <title>{{ page_title | default('Free Video Downloader — Instagram, TikTok, YouTube, Twitter/X, Facebook & Pinterest') }}</title>
+    <meta name="description" content="{{ page_description | default('Download videos and photos from Instagram, TikTok, YouTube, Twitter/X, Facebook, and Pinterest for free. No watermark, no login required. Supports HD 1080p, 720p, MP3 audio. Fast, free & mobile-friendly.') }}">
+    <meta name="keywords" content="{{ page_keywords | default('video downloader, free video downloader, online video downloader, social media downloader, tiktok downloader, instagram downloader, youtube downloader, twitter video downloader, x video downloader, facebook video downloader, pinterest downloader, hd video downloader, no watermark, free media downloader') }}">
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="author" content="QuickSaveVideos">
     <meta name="application-name" content="QuickSaveVideos">
-    <link rel="canonical" href="https://quicksavevideos.com/">
-    <link rel="alternate" hreflang="en" href="https://quicksavevideos.com/">
+    <link rel="canonical" href="{{ page_canonical | default('https://quicksavevideos.com/') }}">
+    <link rel="alternate" hreflang="en" href="{{ page_canonical | default('https://quicksavevideos.com/') }}">
 
     <!-- ── Open Graph (Facebook / WhatsApp / LinkedIn previews) ── -->
     <meta property="og:type"        content="website">
-    <meta property="og:url"         content="https://quicksavevideos.com/">
+    <meta property="og:url"         content="{{ page_canonical | default('https://quicksavevideos.com/') }}">
     <meta property="og:site_name"   content="QuickSaveVideos">
-    <meta property="og:title"       content="Free Video Downloader — TikTok, Instagram, YouTube, Twitter/X, Facebook & Pinterest">
-    <meta property="og:description" content="Download videos & photos from TikTok, Instagram, YouTube, Twitter/X, Facebook and Pinterest. Free, fast, no watermark, no login needed. HD quality supported.">
+    <meta property="og:title"       content="{{ page_title | default('Free Video Downloader — TikTok, Instagram, YouTube, Twitter/X, Facebook & Pinterest') }}">
+    <meta property="og:description" content="{{ page_description | default('Download videos & photos from TikTok, Instagram, YouTube, Twitter/X, Facebook and Pinterest. Free, fast, no watermark, no login needed. HD quality supported.') }}">
     <meta property="og:image"       content="https://quicksavevideos.com/static/og-image.png">
     <meta property="og:image:alt"   content="QuickSaveVideos — free TikTok, Instagram, YouTube, Twitter video downloader">
     <meta property="og:image:width"  content="1200">
@@ -42,9 +30,9 @@
     <!-- ── Twitter Card ── -->
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:site"        content="@quicksavevideos">
-    <meta name="twitter:url"         content="https://quicksavevideos.com/">
-    <meta name="twitter:title"       content="Free Video Downloader — TikTok, Instagram, YouTube, Twitter/X & More">
-    <meta name="twitter:description" content="Download TikTok, Instagram, YouTube, Twitter/X, Facebook & Pinterest videos free. No watermark, no login required.">
+    <meta name="twitter:url"         content="{{ page_canonical | default('https://quicksavevideos.com/') }}">
+    <meta name="twitter:title"       content="{{ page_title | default('Free Video Downloader — TikTok, Instagram, YouTube, Twitter/X & More') }}">
+    <meta name="twitter:description" content="{{ page_description | default('Download TikTok, Instagram, YouTube, Twitter/X, Facebook & Pinterest videos free. No watermark, no login required.') }}">
     <meta name="twitter:image"       content="https://quicksavevideos.com/static/og-image.png">
     <meta name="twitter:image:alt"   content="QuickSaveVideos — free TikTok, Instagram, YouTube, Twitter video downloader">
 
@@ -59,6 +47,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="QuickSaveVideos">
 
+    {% if page_jsonld %}
+    <script type="application/ld+json">{{ page_jsonld | safe }}</script>
+    {% endif %}
+
     <script>(function(s){s.dataset.zone='10859427',s.src='https://nap5k.com/tag.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))</script>
 
     <!-- ── JSON-LD Structured Data ── -->
@@ -66,8 +58,8 @@
         {
             "@context": "https://schema.org",
             "@type": "WebApplication",
-            "name": "QuickSaveVideos — Free Video Downloader",
-            "url": "https://quicksavevideos.com",
+            "name": "{{ page_title | default('QuickSaveVideos — Free Video Downloader') }}",
+            "url": "{{ page_canonical | default('https://quicksavevideos.com') }}",
             "image": "https://quicksavevideos.com/static/og-image.png",
             "description": "Download videos and photos from TikTok, Instagram, YouTube, Twitter/X, Facebook, and Pinterest for free. No watermark, no login required. Supports HD 1080p, 720p, MP3 audio.",
             "applicationCategory": "MultimediaApplication",
@@ -108,7 +100,7 @@
             "mainEntity": [
                 {
                     "@type": "Question",
-                      "name": "How do I download a TikTok video without watermark?",
+                    "name": "How do I download a TikTok video without watermark?",
                     "acceptedAnswer": {
                         "@type": "Answer",
                         "text": "Paste the TikTok video URL into the search box and click Search. QuickSaveVideos downloads the TikTok video in MP4 format. The result is the clean video file without a watermark."
@@ -2397,8 +2389,8 @@
     <header class="hero-header">
         <!-- Search -->
         <div class="search-wrap">
-            <h1>📥 Free Video Downloader — TikTok, Instagram, YouTube & More</h1>
-            <p class="search-subtitle">Download TikTok videos without watermark, Instagram Reels, YouTube Shorts, Twitter/X videos, Facebook Reels, Pinterest videos and photos — free, fast, HD quality, no login needed.</p>
+            <h1>{{ page_h1 | default('📥 Free Video Downloader — TikTok, Instagram, YouTube & More') }}</h1>
+            <p class="search-subtitle">{{ page_subtitle | default('Download TikTok videos without watermark, Instagram Reels, YouTube Shorts, Twitter/X videos, Facebook Reels, Pinterest videos and photos — free, fast, HD quality, no login needed.') }}</p>
             <div class="brand-pills">
                 <span class="brand-pill pill-tk">🎵 TikTok</span>
                 <span class="brand-pill pill-ig">📸 Instagram</span>
@@ -3473,5 +3465,30 @@
         setTimeout(() => { btn.textContent = '📥 Download All'; }, 3500);
     }
 </script>
+
+{% if page_seo_content %}
+{{ page_seo_content | safe }}
+{% endif %}
+
+<!-- ── Site Footer ── -->
+<footer style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:32px 20px;text-align:center;font-size:13px;color:#64748b;margin-top:40px">
+  <div style="max-width:900px;margin:0 auto">
+    <nav style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px 24px;margin-bottom:16px;font-size:14px;font-weight:500">
+      <a href="/" style="color:#4f46e5;text-decoration:none">🏠 Home</a>
+      <a href="/twitter-video-downloader" style="color:#4f46e5;text-decoration:none">𝕏 Twitter Video Downloader</a>
+      <a href="/youtube-video-downloader" style="color:#4f46e5;text-decoration:none">▶️ YouTube Downloader Free</a>
+      <a href="/instagram-video-downloader" style="color:#4f46e5;text-decoration:none">📸 Instagram Video Download</a>
+      <a href="/about" style="color:#4f46e5;text-decoration:none">About</a>
+      <a href="/privacy-policy" style="color:#4f46e5;text-decoration:none">Privacy Policy</a>
+      <a href="/terms" style="color:#4f46e5;text-decoration:none">Terms</a>
+      <a href="/contact" style="color:#4f46e5;text-decoration:none">Contact</a>
+    </nav>
+    <p style="margin-bottom:8px">
+      <strong>QuickSaveVideos</strong> — Free online video downloader for Twitter/X, YouTube, Instagram, TikTok, Facebook &amp; Pinterest.
+    </p>
+    <p style="color:#94a3b8">© 2025 QuickSaveVideos. For personal use only. Not affiliated with any social media platform.</p>
+  </div>
+</footer>
+
 </body>
 </html>

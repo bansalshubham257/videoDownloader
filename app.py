@@ -159,11 +159,11 @@ def is_youtube_url(url):
 def is_youtube_bot_challenge_error(err_text):
     err = (err_text or '').lower()
     return (
-        "sign in to confirm you're not a bot" in err
-        or "sign in to confirm you\u2019re not a bot" in err
-        or 'confirm you\u2019re not a bot' in err
-        or "confirm you're not a bot" in err
-        or 'use --cookies-from-browser or --cookies' in err
+            "sign in to confirm you're not a bot" in err
+            or "sign in to confirm you\u2019re not a bot" in err
+            or 'confirm you\u2019re not a bot' in err
+            or "confirm you're not a bot" in err
+            or 'use --cookies-from-browser or --cookies' in err
     )
 
 
@@ -420,7 +420,7 @@ def detect_url_type(url):
         if '/p/' in clean:
             return 'post'
         if re.search(r'instagram\.com/([A-Za-z0-9_.]+)$', clean) and \
-           not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
+                not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
             return 'profile'
 
     # ── Generic/Unknown website (try with yt-dlp) ────────────────────────
@@ -435,6 +435,276 @@ def detect_url_type(url):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/twitter-video-downloader')
+@app.route('/x-video-downloader')
+def twitter_downloader():
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Twitter / X Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos is the fastest <strong>free online Twitter video downloader</strong> and <strong>X video downloader</strong>.
+        Simply paste any tweet URL that contains a video, GIF, or photos and click <em>Search</em> — your media will be ready to save in seconds.
+        No login, no app install, no watermarks. Works on mobile, tablet and desktop.
+      </p>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Twitter / X Videos — 3 Easy Steps</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Open Twitter/X and find the tweet with the video you want to save.</li>
+        <li>Copy the tweet URL from the address bar (e.g. <code>https://x.com/username/status/12345</code>).</li>
+        <li>Paste it into the search box above and click <strong>Search</strong>, then click <strong>Download</strong>.</li>
+      </ol>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Features of Our Free X Video Downloader</h3>
+      <ul style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>✅ Download Twitter/X videos in MP4 — HD quality</li>
+        <li>✅ Download animated GIFs from tweets</li>
+        <li>✅ Download all photos from a single tweet at once</li>
+        <li>✅ 100% free — no registration, no credit card</li>
+        <li>✅ Works on iPhone, Android, Windows & Mac</li>
+        <li>✅ No watermark added to your downloaded video</li>
+        <li>✅ Private/protected tweet support (no session needed for public tweets)</li>
+      </ul>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Twitter video downloader really free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — QuickSaveVideos is 100% free. There are no hidden charges, no subscription and no sign-up required.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download X videos on my iPhone or Android?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Absolutely. Our online Twitter/X video downloader works in any mobile browser — no app download needed. Just open quicksavevideos.com, paste the tweet link, and save the video to your camera roll.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">What video quality can I download from X/Twitter?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">We automatically fetch the highest quality available for the tweet — usually 720p or 1080p MP4. You can choose from multiple quality options if the tweet offers them.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download GIFs from Twitter/X?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Twitter GIFs are stored as MP4 files and our downloader saves them as MP4, which you can play on any device.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">How do I find the tweet URL on the X mobile app?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Tap the share icon on the tweet → tap <em>Copy link to post</em>. Then paste that URL into the search box above.</p>
+        </details>
+      </div>
+
+      <p style="font-size:13px;color:#94a3b8;line-height:1.7">
+        QuickSaveVideos is not affiliated with Twitter, Inc. or X Corp. Downloading videos is permitted for personal, offline use only.
+        Please respect the original creator's rights and do not re-upload content without permission.
+      </p>
+    </div>
+    """
+    twitter_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {"@type": "Question", "name": "Is this Twitter video downloader really free?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes — QuickSaveVideos is 100% free. No hidden charges, no subscription and no sign-up required."}},
+            {"@type": "Question", "name": "Can I download X videos on my iPhone or Android?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Absolutely. Our online Twitter/X video downloader works in any mobile browser — no app download needed."}},
+            {"@type": "Question", "name": "What video quality can I download from X/Twitter?",
+             "acceptedAnswer": {"@type": "Answer", "text": "We automatically fetch the highest quality available — usually 720p or 1080p MP4."}},
+            {"@type": "Question", "name": "Can I download GIFs from Twitter/X?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. Twitter GIFs are stored as MP4 files and our downloader saves them as MP4."}},
+            {"@type": "Question", "name": "How do I find the tweet URL on the X mobile app?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Tap the share icon on the tweet → tap Copy link to post. Then paste that URL into the search box."}}
+        ]
+    })
+    return render_template(
+        'index.html',
+        page_title='Free Twitter Video Downloader Online — Save X Videos in HD | QuickSaveVideos',
+        page_description='Download Twitter and X videos for free online. Paste any tweet URL and save MP4 videos, GIFs, and photos in HD quality. No login, no watermark, no app needed. Works on mobile.',
+        page_keywords='twitter video downloader, x video downloader, free online twitter video downloader, free online x video downloader, save twitter video, download tweet video, twitter gif downloader, x mp4 download',
+        page_canonical='https://quicksavevideos.com/twitter-video-downloader',
+        page_h1='📥 Free Twitter / X Video Downloader — Save Videos Online',
+        page_subtitle='Paste any Twitter or X tweet URL to download the video, GIF, or photos in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=twitter_jsonld,
+    )
+
+
+@app.route('/youtube-video-downloader')
+@app.route('/youtube-downloader')
+def youtube_downloader():
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">YouTube Downloader Free — Download YouTube Videos Online</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos is a <strong>free YouTube downloader</strong> that lets you save any YouTube video, YouTube Short, or YouTube playlist
+        directly to your device in MP4 (video) or MP3 (audio). Choose your quality — from 360p all the way up to 1080p HD.
+        No software to install, no account needed — just paste, click, and download.
+      </p>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download YouTube Videos Free — 3 Steps</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Go to YouTube and copy the URL of the video you want (e.g. <code>https://www.youtube.com/watch?v=xxxxx</code>).</li>
+        <li>Paste the URL into the search box above and click <strong>Search</strong>.</li>
+        <li>Select your desired quality (1080p, 720p, 360p or MP3) and click <strong>Download</strong>.</li>
+      </ol>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Why Use Our Free YouTube Downloader?</h3>
+      <ul style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>✅ Download YouTube videos in 1080p, 720p, 480p, 360p MP4</li>
+        <li>✅ Extract MP3 audio from any YouTube video for free</li>
+        <li>✅ Download YouTube Shorts as MP4</li>
+        <li>✅ Supports YouTube playlist downloads (up to 500 videos)</li>
+        <li>✅ No watermark, no sign-up, no app install</li>
+        <li>✅ Works on iPhone, Android, Windows & Mac</li>
+        <li>✅ Fast download — no queue, no waiting</li>
+      </ul>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this YouTube downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No hidden fees, no subscription, no account required.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download YouTube videos in 1080p HD?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Select the 1080p or Best Quality option after pasting your YouTube URL and click Download.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">How do I convert a YouTube video to MP3?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Paste the YouTube URL, select the <em>Audio MP3</em> quality option, and click Download. The audio track will be extracted and saved as an MP3 file.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download YouTube Shorts?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes! YouTube Shorts URLs (youtube.com/shorts/...) are fully supported. Paste the Shorts link and download in MP4 format.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download an entire YouTube playlist?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Paste a YouTube playlist URL and all videos in the playlist will appear. You can download them individually or use the Download All button.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Does it work on iPhone and Android?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Our free online YouTube downloader works in Safari, Chrome, and any mobile browser on iPhone and Android without any app installation.</p>
+        </details>
+      </div>
+
+      <p style="font-size:13px;color:#94a3b8;line-height:1.7">
+        QuickSaveVideos is not affiliated with YouTube or Google LLC. Downloads are for personal offline use only.
+        Please respect YouTube's Terms of Service and the original creator's copyright.
+      </p>
+    </div>
+    """
+    youtube_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {"@type": "Question", "name": "Is this YouTube downloader free?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes — completely free. No hidden fees, no subscription, no account required."}},
+            {"@type": "Question", "name": "Can I download YouTube videos in 1080p HD?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. Select the 1080p or Best Quality option after pasting your YouTube URL."}},
+            {"@type": "Question", "name": "How do I convert a YouTube video to MP3?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Paste the YouTube URL, select the Audio MP3 quality option, and click Download."}},
+            {"@type": "Question", "name": "Can I download YouTube Shorts?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes! YouTube Shorts URLs are fully supported. Paste the Shorts link and download as MP4."}},
+            {"@type": "Question", "name": "Does it work on iPhone and Android?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. Works in Safari and Chrome on iOS and Android — no app install needed."}}
+        ]
+    })
+    return render_template(
+        'index.html',
+        page_title='YouTube Downloader Free — Download YouTube Videos & MP3 Online | QuickSaveVideos',
+        page_description='Free YouTube downloader online. Download YouTube videos in HD 1080p, 720p MP4, convert to MP3 audio, save YouTube Shorts & playlists. No login, no watermark, no app needed.',
+        page_keywords='youtube downloader free, youtube video downloader, free youtube downloader, youtube to mp4, youtube to mp3, youtube hd downloader, youtube shorts downloader, download youtube videos online, free online youtube downloader',
+        page_canonical='https://quicksavevideos.com/youtube-video-downloader',
+        page_h1='▶️ Free YouTube Downloader — Save Videos & MP3 Online',
+        page_subtitle='Paste any YouTube URL to download in 1080p HD, 720p, MP3 audio, or save YouTube Shorts and playlists — free, no login, no watermark.',
+        page_seo_content=seo_content,
+        page_jsonld=youtube_jsonld,
+    )
+
+
+@app.route('/instagram-video-downloader')
+@app.route('/instagram-downloader')
+def instagram_downloader_page():
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Instagram Video Download — Free Online Downloader</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos makes <strong>Instagram video download</strong> easy and free. Download Instagram Reels, posts, Stories, and carousel albums
+        directly to your phone or computer in HD quality. No watermark, no login required for public posts.
+      </p>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Instagram Videos — 3 Steps</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Open Instagram and find the Reel, post, or Story you want to download.</li>
+        <li>Tap the three-dot menu → <em>Copy link</em> (or copy the URL from your browser).</li>
+        <li>Paste the link into the search box above and click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">What You Can Download from Instagram</h3>
+      <ul style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>✅ Instagram Reels — download any Reel as MP4</li>
+        <li>✅ Instagram Videos — posts with video content</li>
+        <li>✅ Instagram Photos — save photos at full resolution</li>
+        <li>✅ Instagram Stories — download stories before they expire</li>
+        <li>✅ Instagram Carousels / Albums — download all photos & videos at once</li>
+        <li>✅ Instagram Profile posts — bulk download a profile's public posts</li>
+        <li>✅ No watermark, no app required</li>
+      </ul>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">How do I download an Instagram Reel?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Copy the Reel link from the Instagram app (three dots → Copy link), paste it above, and click Search → Download. The video saves as MP4.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Instagram Stories?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Paste the story URL or the profile URL to access stories. For private accounts you will need to add your Instagram session cookie in ⚙️ Settings.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is Instagram video download free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — 100% free. No subscription, no sign-up, no credit card needed.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Instagram photos and carousels?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. For carousel posts (multiple photos/videos), a grid shows all items. You can download each individually or tap Download All.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Does it work on iPhone and Android?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Works in Safari and Chrome on iOS and Android — no app install needed.</p>
+        </details>
+      </div>
+
+      <p style="font-size:13px;color:#94a3b8;line-height:1.7">
+        QuickSaveVideos is not affiliated with Instagram or Meta. Downloads are for personal offline use only.
+        Please respect the original creator's rights and Instagram's Terms of Use.
+      </p>
+    </div>
+    """
+    instagram_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {"@type": "Question", "name": "How do I download an Instagram Reel?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Copy the Reel link (three dots → Copy link), paste it above, and click Search → Download. The video saves as MP4."}},
+            {"@type": "Question", "name": "Can I download Instagram Stories?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. Paste the story URL or profile URL. For private accounts add your Instagram session cookie in Settings."}},
+            {"@type": "Question", "name": "Is Instagram video download free?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes — 100% free. No subscription, no sign-up, no credit card needed."}},
+            {"@type": "Question", "name": "Can I download Instagram photos and carousels?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. For carousel posts a grid shows all items. You can download each individually or tap Download All."}},
+            {"@type": "Question", "name": "Does it work on iPhone and Android?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. Works in Safari and Chrome on iOS and Android — no app install needed."}}
+        ]
+    })
+    return render_template(
+        'index.html',
+        page_title='Instagram Video Download Free — Save Reels, Stories & Photos Online | QuickSaveVideos',
+        page_description='Download Instagram videos, Reels, Stories, photos and carousels for free online. Save Instagram content in HD quality — no watermark, no login needed. Works on iPhone & Android.',
+        page_keywords='instagram video download, instagram video downloader, instagram reels downloader, download instagram reels, instagram story downloader, instagram photo downloader, save instagram videos, free instagram downloader',
+        page_canonical='https://quicksavevideos.com/instagram-video-downloader',
+        page_h1='📸 Instagram Video Download — Free Online Reels & Story Downloader',
+        page_subtitle='Paste any Instagram post, Reel, Story or profile URL to download videos and photos for free. No watermark, no login required for public content.',
+        page_seo_content=seo_content,
+        page_jsonld=instagram_jsonld,
+    )
 
 
 @app.route('/sw.js')
@@ -482,6 +752,21 @@ def sitemap():
     <loc>https://quicksavevideos.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/twitter-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/youtube-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/instagram-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
   </url>
   <url>
     <loc>https://quicksavevideos.com/about</loc>
@@ -719,11 +1004,11 @@ def get_profile_posts():
             if m:
                 shared = json.loads(m.group(1))
                 edges  = (shared.get('entry_data', {})
-                                .get('ProfilePage', [{}])[0]
-                                .get('graphql', {})
-                                .get('user', {})
-                                .get('edge_owner_to_timeline_media', {})
-                                .get('edges', []))
+                          .get('ProfilePage', [{}])[0]
+                          .get('graphql', {})
+                          .get('user', {})
+                          .get('edge_owner_to_timeline_media', {})
+                          .get('edges', []))
                 for e in edges[:max_posts]:
                     n = e.get('node', {})
                     thumb      = n.get('thumbnail_src') or n.get('display_url', '')
@@ -747,10 +1032,10 @@ def get_profile_posts():
     if not posts:
         needs_cookie = not cookies_are_set()
         msg = (
-            f'Could not fetch posts for @{username}. '
-            + ('Instagram requires a session cookie. Use ⚙️ Settings to add yours.'
-               if needs_cookie
-               else 'Instagram is blocking requests. Your cookie may have expired — update it in ⚙️ Settings.')
+                f'Could not fetch posts for @{username}. '
+                + ('Instagram requires a session cookie. Use ⚙️ Settings to add yours.'
+                   if needs_cookie
+                   else 'Instagram is blocking requests. Your cookie may have expired — update it in ⚙️ Settings.')
         )
         return jsonify({'error': msg, 'needs_cookie': needs_cookie}), 400
 
@@ -923,7 +1208,7 @@ def get_preview():
 
         if not instagram_url or not (instagram_url.startswith('http://') or instagram_url.startswith('https://')):
             return jsonify({'error': 'Please enter a valid URL'}), 400
-        
+
         # Try to extract preview info
         preview_info = extract_preview_info(instagram_url)
 
@@ -937,7 +1222,7 @@ def get_preview():
             })
         else:
             return jsonify({'error': 'Could not extract preview'}), 400
-        
+
     except Exception as e:
         logger.error(f"❌ Error in get_preview: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
@@ -1076,7 +1361,7 @@ def extract_preview_info(url):
                 tweet_id_match = re.search(r'/status/(\d+)', url)
                 if tweet_id_match:
                     tweet_id = tweet_id_match.group(1)
-                    
+
                     # Try syndication API
                     video_url, thumbnail = _extract_twitter_video_direct(tweet_id)
                     if thumbnail:
@@ -1084,7 +1369,7 @@ def extract_preview_info(url):
                         if not preview_data.get('is_video'):
                             preview_data['is_video'] = bool(video_url)
                         logger.info("✅ Twitter thumbnail found via syndication")
-                    
+
                     # Try alt API if no thumbnail yet
                     if not preview_data.get('thumbnail'):
                         video_url, thumbnail = _extract_twitter_video_alt(tweet_id)
@@ -1909,14 +2194,14 @@ def download_instagram_story(url):
 
     needs_cookie = not cookies_are_set()
     msg = (
-        '📖 Story Highlights require authentication to download. '
-        if is_highlight else
-        '📖 Instagram Stories require authentication to download. '
-    ) + (
-        'Add your Instagram session cookie in ⚙️ Settings and try again.'
-        if needs_cookie else
-        'Your cookie may have expired — update it in ⚙️ Settings.'
-    )
+              '📖 Story Highlights require authentication to download. '
+              if is_highlight else
+              '📖 Instagram Stories require authentication to download. '
+          ) + (
+              'Add your Instagram session cookie in ⚙️ Settings and try again.'
+              if needs_cookie else
+              'Your cookie may have expired — update it in ⚙️ Settings.'
+          )
     return jsonify({'error': msg, 'needs_cookie': needs_cookie}), 400
 
 
@@ -2316,10 +2601,10 @@ def get_carousel():
             needs_cookie = not cookies_are_set()
             return jsonify({
                 'error': (
-                    'Could not fetch story items. '
-                    + ('Add your Instagram session cookie in ⚙️ Settings to unlock story downloads.'
-                       if needs_cookie
-                       else 'Instagram may be rate-limiting — try again in a moment.')
+                        'Could not fetch story items. '
+                        + ('Add your Instagram session cookie in ⚙️ Settings to unlock story downloads.'
+                           if needs_cookie
+                           else 'Instagram may be rate-limiting — try again in a moment.')
                 ),
                 'needs_cookie': needs_cookie,
             }), 400
@@ -2491,10 +2776,10 @@ TIKTOK_FORMATS = {
 def _is_format_unavailable_error(err_text):
     err = (err_text or '').lower()
     return (
-        'requested format is not available' in err
-        or 'format is not available' in err
-        or 'no video formats found' in err
-        or 'requested format not available' in err
+            'requested format is not available' in err
+            or 'format is not available' in err
+            or 'no video formats found' in err
+            or 'requested format not available' in err
     )
 
 
@@ -2525,7 +2810,7 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
             cookie_file = resolve_ytdlp_cookie_file()
             if cookie_file:
                 ydl_opts['cookiefile'] = cookie_file
-            
+
             # Properly merge ydl_overrides without losing http_headers
             if ydl_overrides:
                 override_headers = ydl_overrides.pop('http_headers', {})
@@ -2534,7 +2819,7 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
                 ydl_opts['http_headers'].update(override_headers)
                 # Re-add http_headers to ydl_overrides for potential later use
                 ydl_overrides['http_headers'] = override_headers
-            
+
             if merge and FFMPEG_AVAILABLE:
                 ydl_opts['merge_output_format'] = 'mp4'
             if postprocessors and FFMPEG_AVAILABLE:
@@ -2626,24 +2911,24 @@ def _extract_twitter_video_direct(tweet_id):
     try:
         endpoint = f'https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&lang=en'
         logger.info(f"   Fetching syndication: {endpoint[:60]}...")
-        
+
         r = requests.get(endpoint, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
         if r.status_code != 200:
             logger.debug(f"   → Status {r.status_code}")
             return None, None
-        
+
         data = r.json()
         media_details = data.get('mediaDetails') or []
         if not media_details:
             logger.debug(f"   → No media")
             return None, None
-        
+
         first_media = media_details[0]
         thumbnail = first_media.get('media_url_https') or first_media.get('media_url') or ''
-        
+
         video_info = first_media.get('video_info') or {}
         variants = video_info.get('variants') or []
-        
+
         mp4_variants = [v for v in variants if v.get('content_type') == 'video/mp4']
         if mp4_variants:
             mp4_variants.sort(key=lambda x: int(x.get('bitrate', 0)), reverse=True)
@@ -2651,10 +2936,10 @@ def _extract_twitter_video_direct(tweet_id):
             if video_url:
                 logger.info(f"   ✅ Syndication found MP4")
                 return video_url, thumbnail
-        
+
         logger.debug(f"   → No MP4 variants")
         return None, None
-        
+
     except Exception as e:
         logger.debug(f"   → Syndication error: {str(e)[:80]}")
         return None, None
@@ -2666,26 +2951,26 @@ def _extract_twitter_video_alt(tweet_id):
         f'https://api.vxtwitter.com/status/{tweet_id}',
         f'https://api.fxtwitter.com/status/{tweet_id}',
     ]
-    
+
     for endpoint in endpoints:
         try:
             logger.info(f"   Trying {endpoint.split('/')[2]}...")
             r = requests.get(endpoint, timeout=10, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-            
+
             if r.status_code != 200:
                 logger.debug(f"   → Status {r.status_code}")
                 continue
-            
+
             data = r.json()
-            
+
             # Search for MP4 URLs - check all string values in response
             videos = []
             thumbs = []
-            
+
             def extract_urls(obj, depth=0):
                 if depth > 15:
                     return
-                
+
                 if isinstance(obj, dict):
                     for k, v in obj.items():
                         if isinstance(v, str):
@@ -2700,18 +2985,18 @@ def _extract_twitter_video_alt(tweet_id):
                 elif isinstance(obj, list):
                     for x in obj:
                         extract_urls(x, depth + 1)
-            
+
             extract_urls(data)
-            
+
             if videos:
                 logger.info(f"   ✅ {endpoint.split('/')[2]} found MP4")
                 thumb = thumbs[0] if thumbs else ''
                 return videos[0], thumb
-            
+
         except Exception as e:
             logger.debug(f"   → {endpoint.split('/')[2]} error: {str(e)[:50]}")
             continue
-    
+
     logger.debug(f"   → No videos found in alt APIs")
     return None, None
 
@@ -2955,14 +3240,14 @@ def _fetch_twitter_html_scrape_media(url):
         r = requests.get(url, headers=headers, timeout=20, allow_redirects=True)
         if r.status_code != 200:
             return {}
-        
+
         html = r.text
         media_data = {}
-        
+
         # Look for video URLs in JavaScript/JSON embedded in the page
         import json as json_lib
         import re as re_lib
-        
+
         # Pattern 1: Look for video URLs in initialState or similar JSON
         patterns = [
             r'"mediaKey"\s*:\s*"([^"]*)"',
@@ -2972,7 +3257,7 @@ def _fetch_twitter_html_scrape_media(url):
             r'https://pbs\.twimg\.com/media/[^"\s]+\.mp4',
             r'https://pbs\.twimg\.com/media/[^"\s]+\?format=',
         ]
-        
+
         for pattern in patterns:
             match = re_lib.search(pattern, html)
             if match:
@@ -2986,13 +3271,13 @@ def _fetch_twitter_html_scrape_media(url):
                         media_data.setdefault('image_url', url_candidate)
                     if media_data.get('image_url') and media_data.get('video_url'):
                         break
-        
+
         # Pattern 2: Extract tweet text
         text_pattern = r'"description"\s*:\s*"([^"\\]*(\\.[^"\\]*)*)"'
         text_match = re_lib.search(text_pattern, html)
         if text_match:
             media_data['description'] = text_match.group(1)
-        
+
         if media_data.get('video_url') or media_data.get('image_url'):
             return {
                 'thumbnail': media_data.get('image_url', ''),
@@ -3003,16 +3288,16 @@ def _fetch_twitter_html_scrape_media(url):
             }
     except Exception as e:
         logger.info(f"   → HTML scrape error: {str(e)[:100]}")
-    
+
     return {}
 
 
 def _download_twitter_via_public_fallbacks(url):
     """Try public metadata APIs and download the discovered media URL."""
     for source_name, fetcher in (
-        ('syndication', _fetch_twitter_syndication_media),
-        ('alt api', _fetch_twitter_alt_api_media),
-        ('html scrape', _fetch_twitter_html_scrape_media),
+            ('syndication', _fetch_twitter_syndication_media),
+            ('alt api', _fetch_twitter_alt_api_media),
+            ('html scrape', _fetch_twitter_html_scrape_media),
     ):
         try:
             data = fetcher(url) or {}
@@ -3030,16 +3315,16 @@ def _download_twitter_via_public_fallbacks(url):
 def download_twitter(url, quality='best'):
     """Download a Twitter/X video - always attempt download, show button regardless."""
     logger.info(f"🐦 Twitter/X download: {url} | quality={quality}")
-    
+
     # Extract tweet ID
     import re
     tweet_id_match = re.search(r'/status/(\d+)', url)
     if not tweet_id_match:
         return jsonify({'error': '❌ Invalid Twitter URL. Please use a tweet URL with /status/ID'}), 400
-    
+
     tweet_id = tweet_id_match.group(1)
     logger.info(f"   Tweet ID: {tweet_id}")
-    
+
     # Step 1: Try direct video extraction via syndication API
     logger.info(f"   → Trying syndication API...")
     video_url, thumbnail = _extract_twitter_video_direct(tweet_id)
@@ -3048,7 +3333,7 @@ def download_twitter(url, quality='best'):
         result = _download_raw_url(video_url, 'mp4')
         if result:
             return result
-    
+
     # Step 2: Try yt-dlp with minimal config
     if YTDLP_AVAILABLE:
         logger.info(f"   → Trying yt-dlp...")
@@ -3062,13 +3347,13 @@ def download_twitter(url, quality='best'):
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
                 },
             }
-            
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
                 if info and info.get('formats'):
                     # Find best MP4 video format
-                    mp4_formats = [f for f in info.get('formats', []) 
-                                  if f.get('ext') == 'mp4' and f.get('vcodec') != 'none']
+                    mp4_formats = [f for f in info.get('formats', [])
+                                   if f.get('ext') == 'mp4' and f.get('vcodec') != 'none']
                     if mp4_formats:
                         # Sort by height (quality)
                         mp4_formats.sort(key=lambda x: int(x.get('height') or 0), reverse=True)
@@ -3081,7 +3366,7 @@ def download_twitter(url, quality='best'):
                                 return result
         except Exception as e:
             logger.warning(f"   ⚠️ yt-dlp error: {str(e)[:100]}")
-    
+
     # Step 3: Try alternative APIs
     logger.info(f"   → Trying alternative APIs...")
     alt_video_url, alt_thumbnail = _extract_twitter_video_alt(tweet_id)
@@ -3090,11 +3375,11 @@ def download_twitter(url, quality='best'):
         result = _download_raw_url(alt_video_url, 'mp4')
         if result:
             return result
-    
+
     # REMOVED: No longer block download if video not found
     # Just log the issue and let user try anyway
     logger.warning(f"   ⚠️ Could not extract video via APIs, but proceeding with download attempt")
-    
+
     # Last resort: Try downloading with yt-dlp anyway, maybe it can extract it
     if YTDLP_AVAILABLE:
         logger.info(f"   → Last resort: Full yt-dlp download attempt...")
@@ -3109,7 +3394,7 @@ def download_twitter(url, quality='best'):
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 },
             }
-            
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 if info:
@@ -3124,7 +3409,7 @@ def download_twitter(url, quality='best'):
                         })
         except Exception as e:
             logger.warning(f"   ⚠️ Last resort failed: {str(e)[:100]}")
-    
+
     # If everything fails, return a generic error (not "no video found")
     return jsonify({'error': '⚠️ Could not download from this tweet. Please try again later.'}), 400
 
@@ -3174,7 +3459,7 @@ def download_pinterest(url):
             combined = [
                 f for f in formats
                 if f.get('vcodec', 'none') not in ('none', None, '')
-                and f.get('acodec', 'none') not in ('none', None, '')
+                   and f.get('acodec', 'none') not in ('none', None, '')
             ]
             if combined:
                 combined.sort(
@@ -4090,8 +4375,8 @@ def proxy_thumbnail():
             'User-Agent': get_random_user_agent(),
             'Referer':    ('https://www.tiktok.com/' if is_tiktok
                            else 'https://www.pinterest.com/' if is_pinterest
-                           else 'https://twitter.com/' if is_twitter
-                           else 'https://www.instagram.com/'),
+            else 'https://twitter.com/' if is_twitter
+            else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
         if not is_twitter and not is_pinterest and not is_tiktok:
@@ -4162,4 +4447,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     debug = not IS_PRODUCTION
     app.run(debug=debug, host='0.0.0.0', port=port)
-

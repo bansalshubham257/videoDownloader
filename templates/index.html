@@ -2589,6 +2589,37 @@
         @media (max-width: 640px) {
             .site-guides { grid-template-columns: 1fr; }
         }
+        .home-breadcrumb {
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 10px 20px 0;
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+        .home-breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .home-breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .home-breadcrumb span {
+            margin: 0 4px;
+        }
+        .guide-link {
+            font-size: 13px;
+            margin: 12px 0 4px;
+            text-align: right;
+        }
+        .guide-link a {
+            color: var(--accent);
+            text-decoration: none;
+            opacity: 0.85;
+        }
+        .guide-link a:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body class="auto-download-mode">
@@ -2681,6 +2712,12 @@
         </div><!-- /settings-panel -->
     </header>
 
+    <nav aria-label="Breadcrumb" class="home-breadcrumb">
+        <a href="/">Home</a>
+        <span aria-hidden="true">›</span>
+        <span aria-current="page">Free Video Downloader</span>
+    </nav>
+
     <main id="main-content">
         <div id="msg" role="status" aria-live="polite"></div>
 
@@ -2690,6 +2727,9 @@
             <div class="result-title-row">
                 <h2 id="s-title" style="margin-bottom:0;">Search result</h2>
                 <button class="copy-btn" id="s-title-copy" onclick="copyText(document.getElementById('s-title').textContent,this)" title="Copy title">⎘ Copy</button>
+            </div>
+            <div class="guide-link" id="guide-link" style="display:none">
+                <a id="guide-link-a" href="#" target="_blank">📖 Read the full guide ›</a>
             </div>
             <p class="s-meta" id="s-meta"></p>
 
@@ -3025,6 +3065,28 @@
     let dlHistory = JSON.parse(localStorage.getItem('igDlHistory') || '[]').slice(0, 5);
     renderHistory();
 
+    /* ─── GUIDE LINK ─────────────────────────────────────────────────────── */
+    const GUIDE_PATHS = {
+        'instagram': '/how-to-download-instagram-videos',
+        'tiktok': '/how-to-download-tiktok-videos',
+        'youtube': '/how-to-download-youtube-videos',
+        'twitter': '/how-to-download-twitter-videos',
+        'facebook': '/how-to-download-facebook-videos',
+        'pinterest': '/how-to-download-pinterest-videos',
+    };
+    function updateGuideLink(platform) {
+        const el = document.getElementById('guide-link');
+        const a  = document.getElementById('guide-link-a');
+        if (!el || !a) return;
+        const key = platform === 'instagram_story' ? 'instagram' : platform;
+        if (GUIDE_PATHS[key]) {
+            a.href = GUIDE_PATHS[key];
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+        }
+    }
+
     /* ─── COOKIE STATUS ──────────────────────────────────────────────────── */
     async function checkCookieStatus() {
         try {
@@ -3172,6 +3234,7 @@
 
     /* ─── YOUTUBE PLAYLIST / CHANNEL ─────────────────────────────────────── */
     async function loadYouTubePlaylist(url) {
+        updateGuideLink('youtube');
         const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
         showMsg(`Fetching YouTube playlist / channel…`, 'info');
         try {
@@ -3199,6 +3262,7 @@
 
     /* ─── INSTAGRAM PROFILE ───────────────────────────────────────────────── */
     async function loadProfile(url) {
+        updateGuideLink('instagram');
         const max_posts = parseInt(document.getElementById('max-posts-select').value, 10);
         showMsg(`Fetching up to ${max_posts} Instagram posts…`, 'info');
         try {
@@ -3398,6 +3462,7 @@
 
     /* ─── SINGLE POST MODE ───────────────────────────────────────────────── */
     async function loadSinglePost(url, platform) {
+        updateGuideLink(platform);
         showMsg('Loading preview…', 'info');
         const igOpts = document.getElementById('ig-options');
         const ytOpts = document.getElementById('yt-quality-row');

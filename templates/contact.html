@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact - QuickSaveVideos</title>
+    <meta name="description" content="Contact QuickSaveVideos for support, feedback, business inquiries, and policy-related requests.">
+    <link rel="canonical" href="https://quicksavevideos.com/contact">
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #475569;
+            --accent: #4f46e5;
+            --border: #e2e8f0;
+        }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .wrap {
+            max-width: 860px;
+            margin: 24px auto;
+            padding: 0 14px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        h1, h2 { margin-top: 0; }
+        .muted { color: var(--muted); }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .nav { margin-top: 18px; font-size: 14px; }
+        .box {
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 10px;
+            padding: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <main class="card">
+        <h1>Contact QuickSaveVideos</h1>
+        <p class="muted">For support, legal, copyright, or business requests, please contact us.</p>
+
+        <div class="box">
+            <strong>Email:</strong> support@quicksavevideos.com
+        </div>
+
+        <h2>Response Time</h2>
+        <p>We usually respond within 24 to 72 hours depending on request volume.</p>
+
+        <h2>Important</h2>
+        <p>If your request is related to content rights, include exact URLs and clear ownership details so we can review quickly.</p>
+
+        <p class="nav">
+            <a href="{{ url_for('index') }}">Home</a> |
+            <a href="{{ url_for('about') }}">About</a> |
+            <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a> |
+            <a href="{{ url_for('terms') }}">Terms</a>
+        </p>
+    </main>
+</div>
+</body>
+</html>
+

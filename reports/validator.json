@@ -1,0 +1,101 @@
+{
+  "base_url": "https://quicksavevideos.com",
+  "total": 5,
+  "passed": 1,
+  "failed": 4,
+  "results": [
+    {
+      "name": "Pinterest",
+      "url": "https://pin.it/6De5hmpnC",
+      "detect_ok": true,
+      "detect_value": "pinterest_post",
+      "preview_ok": true,
+      "thumbnail_ok": true,
+      "title_ok": true,
+      "description_ok": true,
+      "download_ok": true,
+      "file_fetch_ok": true,
+      "file_name": "285978645083449045.mp4",
+      "file_size_bytes_seen": 65536,
+      "content_type": "video/mp4",
+      "errors": [],
+      "passed": true
+    },
+    {
+      "name": "YouTube",
+      "url": "https://youtube.com/shorts/cl0odsrNOc0?si=79_edw4T9AxuQHyI",
+      "detect_ok": true,
+      "detect_value": "yt_video",
+      "preview_ok": true,
+      "thumbnail_ok": true,
+      "title_ok": true,
+      "description_ok": true,
+      "download_ok": false,
+      "file_fetch_ok": false,
+      "file_name": "",
+      "file_size_bytes_seen": 0,
+      "content_type": "",
+      "errors": [
+        "download bad response: status=400, body={'error': 'YouTube download failed. This video may be temporarily unavailable right now.'}"
+      ],
+      "passed": false
+    },
+    {
+      "name": "Instagram",
+      "url": "https://www.instagram.com/reel/DK_XSFXTaRt/?hl=en",
+      "detect_ok": true,
+      "detect_value": "reel",
+      "preview_ok": true,
+      "thumbnail_ok": true,
+      "title_ok": true,
+      "description_ok": true,
+      "download_ok": false,
+      "file_fetch_ok": false,
+      "file_name": "",
+      "file_size_bytes_seen": 0,
+      "content_type": "",
+      "errors": [
+        "download bad response: status=400, body={'error': 'Instagram is rate-limiting or blocking this reel right now. Please try again in a few minutes. If it keeps failing, the reel may require login to access.'}"
+      ],
+      "passed": false
+    },
+    {
+      "name": "X",
+      "url": "https://x.com/fend_zones/status/2042302012092539177?s=20",
+      "detect_ok": true,
+      "detect_value": "twitter_video",
+      "preview_ok": true,
+      "thumbnail_ok": true,
+      "title_ok": true,
+      "description_ok": true,
+      "download_ok": false,
+      "file_fetch_ok": false,
+      "file_name": "",
+      "file_size_bytes_seen": 0,
+      "content_type": "",
+      "errors": [
+        "download bad response: status=400, body={'error': '\u274c No video found in this tweet. Tweet may contain only text or images.'}"
+      ],
+      "passed": false
+    },
+    {
+      "name": "Facebook",
+      "url": "https://www.facebook.com/facebook/videos/paint-me-like-one-of-your-facebook-reels-video-by-sams-sketchbooksmusic-by-conni/9879297875528418/",
+      "detect_ok": true,
+      "detect_value": "facebook_video",
+      "preview_ok": false,
+      "thumbnail_ok": false,
+      "title_ok": false,
+      "description_ok": false,
+      "download_ok": true,
+      "file_fetch_ok": true,
+      "file_name": "media_1775891563.mp4",
+      "file_size_bytes_seen": 65536,
+      "content_type": "video/mp4",
+      "errors": [
+        "preview bad response: status=400, body={'error': 'Could not extract preview'}"
+      ],
+      "passed": false
+    }
+  ]
+}

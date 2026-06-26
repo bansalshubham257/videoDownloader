@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Downloaded files — never commit, always use /tmp at runtime
+downloads/
+*.mp4
+*.mp3
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webm
+*.m4a
+*.mkv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Instagram session cookies (sensitive — never commit these)
+instagram_cookies.json
+instagram_cookies.txt

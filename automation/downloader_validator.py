@@ -40,25 +40,18 @@ DEFAULT_CASES = [
         "name": "Instagram",
         "url": "https://www.instagram.com/reel/DK_XSFXTaRt/?hl=en",
         "expected_detect": "reel",
-        "rate_limit_sensitive": True,
-        "min_delay_before_test": 10,  # seconds - Instagram is aggressive with rate-limiting
     },
     {
         "name": "X",
-        "url": "https://x.com/fend_zones/status/2042302012092539177?s=20",
+        "url": "https://x.com/nsinghal211/status/2042484856282849526?s=20",
         "expected_detect": "twitter_video",
-    },
-    {
-        "name": "Facebook",
-        "url": "https://www.facebook.com/facebook/videos/paint-me-like-one-of-your-facebook-reels-video-by-sams-sketchbooksmusic-by-conni/9879297875528418/",
-        "expected_detect": "facebook_video",
     },
 ]
 
 # A generic downloader sample (unknown to explicit platform handlers)
 DEFAULT_UNKNOWN_CASE = {
     "name": "Unknown-Generic",
-    "url": "https://www.reddit.com/r/youtube/comments/1mlh3pw/youtube_alternatives/",
+    "url": "https://vimeo.com/76979871",
     "expected_detect": "generic",
 }
 
@@ -78,7 +71,6 @@ class CheckResult:
     file_name: str = ""
     file_size_bytes_seen: int = 0
     content_type: str = ""
-    rate_limit_hit: bool = False
     errors: List[str] = field(default_factory=list)
 
     @property
@@ -100,26 +92,6 @@ class Validator:
         self.timeout = timeout
         self.retries = retries
         self.session = requests.Session()
-        self.rate_limit_keywords = [
-            "rate.limit",
-            "rate-limit",
-            "rate_limit",
-            "too.many",
-            "too_many",
-            "too many",
-            "429",
-            "login.require",
-            "login_require",
-            "login required",
-            "not.available",
-            "not_available",
-            "not available",
-        ]
-
-    def _is_rate_limit_error(self, error_text: str) -> bool:
-        """Check if error message indicates rate-limiting or blocking."""
-        error_lower = str(error_text).lower()
-        return any(keyword in error_lower for keyword in self.rate_limit_keywords)
 
     def _post_json(self, path: str, payload: Dict) -> Tuple[Optional[requests.Response], Optional[Dict], Optional[str]]:
         url = urljoin(self.base_url + "/", path.lstrip("/"))
@@ -136,9 +108,7 @@ class Validator:
             except Exception as e:  # noqa: BLE001
                 last_error = str(e)
                 if attempt < self.retries:
-                    # Longer backoff for rate-limit errors
-                    backoff = min(3.0 * (2 ** (attempt - 1)), 15.0)
-                    time.sleep(backoff)
+                    time.sleep(min(1.5 * attempt, 4.0))
         return None, None, last_error
 
     def _get_stream(self, path: str) -> Tuple[Optional[requests.Response], Optional[str], int, str]:

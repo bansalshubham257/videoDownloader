@@ -166,6 +166,142 @@
         }
     </script>
 
+    <!-- ── BreadcrumbList ── -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                { "@type": "ListItem", "position": 1, "name": "Home", "item": "{{ page_canonical | default('https://quicksavevideos.com/') }}" },
+                { "@type": "ListItem", "position": 2, "name": "Free Video Downloader", "item": "{{ page_canonical | default('https://quicksavevideos.com/') }}" }
+            ]
+        }
+    </script>
+
+    <!-- ── WebSite + SearchAction ── -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "QuickSaveVideos",
+            "url": "{{ page_canonical | default('https://quicksavevideos.com/') }}",
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": {
+                    "@type": "EntryPoint",
+                    "urlTemplate": "{{ page_canonical | default('https://quicksavevideos.com/') }}?q={search_term_string}"
+                },
+                "query-input": "required name=search_term_string"
+            }
+        }
+    </script>
+
+    <!-- ── Organization ── -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "QuickSaveVideos",
+            "url": "{{ page_canonical | default('https://quicksavevideos.com/') }}",
+            "logo": "https://quicksavevideos.com/static/og-image.png",
+            "description": "Free online video downloader for social media platforms. Download videos from TikTok, Instagram, YouTube, Twitter/X, Facebook, and Pinterest without watermark or login.",
+            "sameAs": [
+                "https://twitter.com/quicksavevideos"
+            ]
+        }
+    </script>
+
+    <!-- ── Per‑Platform HowTo Schemas ── -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to download Instagram Reels and videos",
+            "description": "Download Instagram Reels, posts, stories, and carousel albums in original quality with QuickSaveVideos.",
+            "step": [
+                { "@type": "HowToStep", "position": 1, "name": "Copy the Instagram URL", "text": "Open the Instagram app or website, go to the post, Reel, or story you want to download, and copy its URL from the address bar or share menu." },
+                { "@type": "HowToStep", "position": 2, "name": "Paste the URL", "text": "Paste the copied Instagram URL into the search box on QuickSaveVideos." },
+                { "@type": "HowToStep", "position": 3, "name": "Click Search", "text": "Click the Search button. The tool will fetch the media and show a preview." },
+                { "@type": "HowToStep", "position": 4, "name": "Download", "text": "Choose your preferred format (video, audio, or both) and click Download to save the file to your device." }
+            ]
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to download TikTok videos without watermark",
+            "description": "Save TikTok videos in MP4 without a watermark using QuickSaveVideos free online tool.",
+            "step": [
+                { "@type": "HowToStep", "position": 1, "name": "Copy the TikTok video link", "text": "Open TikTok, tap the Share icon on any video, and select Copy Link." },
+                { "@type": "HowToStep", "position": 2, "name": "Paste into QuickSaveVideos", "text": "Paste the copied TikTok link into the search box on QuickSaveVideos." },
+                { "@type": "HowToStep", "position": 3, "name": "Click Search", "text": "Click Search to fetch the video. The tool removes the watermark automatically." },
+                { "@type": "HowToStep", "position": 4, "name": "Download the clean MP4", "text": "Select your preferred quality and click Download to save the watermark-free video." }
+            ]
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to download YouTube videos and Shorts in HD",
+            "description": "Download YouTube videos up to 1080p and YouTube Shorts for free. Also extract MP3 audio from any YouTube video.",
+            "step": [
+                { "@type": "HowToStep", "position": 1, "name": "Copy the YouTube URL", "text": "Open YouTube, go to any video or Short, and copy the URL from your browser's address bar." },
+                { "@type": "HowToStep", "position": 2, "name": "Paste and search", "text": "Paste the YouTube URL into the QuickSaveVideos search box and click Search." },
+                { "@type": "HowToStep", "position": 3, "name": "Select quality", "text": "Choose your preferred quality: Best, 1080p, 720p, 480p, 360p, or Audio MP3." },
+                { "@type": "HowToStep", "position": 4, "name": "Download", "text": "Click Download to save the video or audio file to your device." }
+            ]
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to download Twitter X videos and photos",
+            "description": "Download videos, GIFs, and images from any public Twitter/X tweet using QuickSaveVideos.",
+            "step": [
+                { "@type": "HowToStep", "position": 1, "name": "Copy the tweet URL", "text": "On Twitter/X, click the Share icon on any tweet and select Copy Link, or copy the /status/ URL from the address bar." },
+                { "@type": "HowToStep", "position": 2, "name": "Paste into QuickSaveVideos", "text": "Paste the tweet URL into the search box and click Search." },
+                { "@type": "HowToStep", "position": 3, "name": "View available media", "text": "All photos and videos in the tweet will appear in a grid. Select the ones you want." },
+                { "@type": "HowToStep", "position": 4, "name": "Download", "text": "Click Download on each item to save it individually." }
+            ]
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to download Facebook videos and Reels",
+            "description": "Download Facebook Reels, videos, and stories for free without login using QuickSaveVideos.",
+            "step": [
+                { "@type": "HowToStep", "position": 1, "name": "Copy the Facebook video URL", "text": "Open Facebook, go to the video or Reel you want, and copy the URL from the address bar or share menu." },
+                { "@type": "HowToStep", "position": 2, "name": "Paste and search", "text": "Paste the Facebook URL into QuickSaveVideos and click Search." },
+                { "@type": "HowToStep", "position": 3, "name": "Choose quality", "text": "Select from available quality options: Best, HD 720p, SD 480p, 360p, or Audio." },
+                { "@type": "HowToStep", "position": 4, "name": "Download", "text": "Click Download to save the Facebook video to your device." }
+            ]
+        }
+    </script>
+
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "HowTo",
+            "name": "How to download Pinterest videos and images",
+            "description": "Save Pinterest pins including videos and images for free with QuickSaveVideos.",
+            "step": [
+                { "@type": "HowToStep", "position": 1, "name": "Copy the Pinterest pin URL", "text": "Open Pinterest, go to the pin you want to download, and copy the URL from your browser's address bar." },
+                { "@type": "HowToStep", "position": 2, "name": "Paste into QuickSaveVideos", "text": "Paste the Pinterest URL into the search box and click Search." },
+                { "@type": "HowToStep", "position": 3, "name": "Preview the pin", "text": "The tool will show a preview of the video or image from the pin." },
+                { "@type": "HowToStep", "position": 4, "name": "Download", "text": "Click Download to save the Pinterest media to your device." }
+            ]
+        }
+    </script>
+
     <style>
         :root {
             --primary: #4f46e5;
@@ -2372,6 +2508,81 @@
                 font-size: 10px;
             }
         }
+
+        /* ── FAQ section ── */
+        .site-faq {
+            max-width: 860px;
+            margin: 48px auto;
+            padding: 0 20px;
+        }
+        .site-faq h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+        .faq-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: #fff;
+            overflow: hidden;
+        }
+        .faq-item summary {
+            padding: 14px 18px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            color: var(--text-primary);
+            background: #f8fafc;
+        }
+        .faq-item summary:hover {
+            background: #f1f5f9;
+        }
+        .faq-item p {
+            padding: 12px 18px 16px;
+            margin: 0;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ── Platform guides section ── */
+        .site-guides {
+            max-width: 900px;
+            margin: 48px auto;
+            padding: 0 20px;
+        }
+        .site-guides h2 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            color: var(--text-primary);
+            text-align: center;
+        }
+        .guide-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            background: #fff;
+        }
+        .guide-card h3 {
+            font-size: 17px;
+            margin: 0 0 10px;
+            color: var(--primary);
+        }
+        .guide-card ol {
+            margin: 0 0 8px;
+            padding-left: 20px;
+        }
+        .guide-card li {
+            margin-bottom: 4px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .guide-card p {
+            margin: 0;
+            color: var(--text-tertiary);
+            font-size: 14px;
+        }
     </style>
 </head>
 <body class="auto-download-mode">
@@ -2613,6 +2824,115 @@
         </div>
 
     </main>
+
+    <!-- ── FAQ (Visible + matches FAQPage schema) ── -->
+    <section class="site-faq" aria-label="Frequently asked questions">
+        <h2>Frequently Asked Questions</h2>
+
+        <details class="faq-item">
+            <summary>How do I download a TikTok video without watermark?</summary>
+            <p>Paste the TikTok video URL into the search box and click Search. QuickSaveVideos downloads the TikTok video in MP4 format. The result is the clean video file without a watermark.</p>
+        </details>
+        <details class="faq-item">
+            <summary>How do I download an Instagram Reel or video?</summary>
+            <p>Paste the Instagram post, Reel, or story URL into the search box and click Search. Then choose your format and click Download.</p>
+        </details>
+        <details class="faq-item">
+            <summary>Can I download YouTube videos in HD?</summary>
+            <p>Yes. After pasting a YouTube URL select 1080p, 720p or Best quality and click Download. YouTube Shorts are also supported.</p>
+        </details>
+        <details class="faq-item">
+            <summary>How do I download a Twitter or X video?</summary>
+            <p>Paste the tweet URL (containing /status/) into the search box and click Search. All photos and videos in the tweet will be available to download individually.</p>
+        </details>
+        <details class="faq-item">
+            <summary>Can I download Instagram albums with multiple photos?</summary>
+            <p>Yes. When an Instagram post contains multiple photos or videos, a grid of all items appears. You can download each one individually or use the Download All button.</p>
+        </details>
+        <details class="faq-item">
+            <summary>Is this video downloader free?</summary>
+            <p>Yes, QuickSaveVideos is completely free with no login or registration required.</p>
+        </details>
+        <details class="faq-item">
+            <summary>Which platforms are supported?</summary>
+            <p>TikTok, Instagram (posts, Reels, Stories, albums), YouTube (videos, Shorts, playlists), Twitter/X, Facebook, and Pinterest are all supported.</p>
+        </details>
+        <details class="faq-item">
+            <summary>Can I extract MP3 audio from a YouTube video?</summary>
+            <p>Yes. After pasting a YouTube URL, select the Audio MP3 quality option and click Download to save just the audio track.</p>
+        </details>
+    </section>
+
+    <!-- ── Platform Step-by-Step Guides ── -->
+    <section class="site-guides" aria-label="Platform download guides">
+        <h2>How to Download Videos — Step by Step Guides</h2>
+
+        <article class="guide-card" id="guide-instagram">
+            <h3>How to Download Instagram Reels and Videos</h3>
+            <ol>
+                <li><strong>Copy the Instagram URL</strong> — Open the Instagram app or website, go to the post, Reel, or story you want to download, and copy its URL from the address bar or share menu.</li>
+                <li><strong>Paste the URL</strong> — Paste the copied Instagram URL into the search box on QuickSaveVideos.</li>
+                <li><strong>Click Search</strong> — The tool will fetch the media and show a preview.</li>
+                <li><strong>Download</strong> — Choose your preferred format (video, audio, or both) and click Download to save the file to your device.</li>
+            </ol>
+            <p>QuickSaveVideos supports Instagram Reels, posts, carousel albums, Stories, and profile photos. No login required.</p>
+        </article>
+
+        <article class="guide-card" id="guide-tiktok">
+            <h3>How to Download TikTok Videos Without Watermark</h3>
+            <ol>
+                <li><strong>Copy the TikTok video link</strong> — Open TikTok, tap the Share icon on any video, and select Copy Link.</li>
+                <li><strong>Paste into QuickSaveVideos</strong> — Paste the copied TikTok link into the search box.</li>
+                <li><strong>Click Search</strong> — The tool fetches the video and automatically removes the watermark.</li>
+                <li><strong>Download the clean MP4</strong> — Select your preferred quality and click Download.</li>
+            </ol>
+            <p>Save any TikTok video in MP4 without a watermark. Works for trending, viral, and short videos.</p>
+        </article>
+
+        <article class="guide-card" id="guide-youtube">
+            <h3>How to Download YouTube Videos and Shorts in HD</h3>
+            <ol>
+                <li><strong>Copy the YouTube URL</strong> — Open YouTube, go to any video or Short, and copy the URL from your browser's address bar.</li>
+                <li><strong>Paste and search</strong> — Paste the YouTube URL into the search box and click Search.</li>
+                <li><strong>Select quality</strong> — Choose Best, 1080p, 720p, 480p, 360p, or Audio MP3.</li>
+                <li><strong>Download</strong> — Click Download to save the video or audio file to your device.</li>
+            </ol>
+            <p>Download YouTube videos up to 1080p, save YouTube Shorts, or extract MP3 audio from any video.</p>
+        </article>
+
+        <article class="guide-card" id="guide-twitter">
+            <h3>How to Download Twitter/X Videos and Photos</h3>
+            <ol>
+                <li><strong>Copy the tweet URL</strong> — On Twitter/X, click the Share icon and select Copy Link, or copy the /status/ URL from the address bar.</li>
+                <li><strong>Paste into QuickSaveVideos</strong> — Paste the tweet URL into the search box and click Search.</li>
+                <li><strong>View available media</strong> — All photos and videos in the tweet appear in a grid.</li>
+                <li><strong>Download</strong> — Click Download on each item to save it individually.</li>
+            </ol>
+            <p>Download videos, GIFs, and images from any public tweet, including multi-photo tweets.</p>
+        </article>
+
+        <article class="guide-card" id="guide-facebook">
+            <h3>How to Download Facebook Videos and Reels</h3>
+            <ol>
+                <li><strong>Copy the Facebook video URL</strong> — Open Facebook, go to the video or Reel, and copy the URL from the address bar or share menu.</li>
+                <li><strong>Paste and search</strong> — Paste the Facebook URL into QuickSaveVideos and click Search.</li>
+                <li><strong>Choose quality</strong> — Select Best, HD 720p, SD 480p, 360p, or Audio.</li>
+                <li><strong>Download</strong> — Click Download to save the video to your device.</li>
+            </ol>
+            <p>Download Facebook Reels and videos for free without needing to log in.</p>
+        </article>
+
+        <article class="guide-card" id="guide-pinterest">
+            <h3>How to Download Pinterest Videos and Images</h3>
+            <ol>
+                <li><strong>Copy the Pinterest pin URL</strong> — Open Pinterest, go to the pin, and copy the URL from your browser's address bar.</li>
+                <li><strong>Paste into QuickSaveVideos</strong> — Paste the Pinterest URL into the search box and click Search.</li>
+                <li><strong>Preview the pin</strong> — The tool shows a preview of the video or image.</li>
+                <li><strong>Download</strong> — Click Download to save the media to your device.</li>
+            </ol>
+            <p>Save Pinterest pins including videos and images, all without login.</p>
+        </article>
+    </section>
 
     <!-- SEO Footer -->
     <footer class="site-footer">

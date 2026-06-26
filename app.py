@@ -733,6 +733,33 @@ def terms():
     return render_template('terms.html')
 
 
+# ── SEO Guide Pages ──
+
+@app.route('/how-to-download-instagram-videos')
+def guide_instagram():
+    return render_template('guide-instagram.html')
+
+@app.route('/how-to-download-tiktok-videos')
+def guide_tiktok():
+    return render_template('guide-tiktok.html')
+
+@app.route('/how-to-download-youtube-videos')
+def guide_youtube():
+    return render_template('guide-youtube.html')
+
+@app.route('/how-to-download-twitter-videos')
+def guide_twitter():
+    return render_template('guide-twitter.html')
+
+@app.route('/how-to-download-facebook-videos')
+def guide_facebook():
+    return render_template('guide-facebook.html')
+
+@app.route('/how-to-download-pinterest-videos')
+def guide_pinterest():
+    return render_template('guide-pinterest.html')
+
+
 @app.route('/robots.txt')
 def robots():
     txt = """User-agent: *
@@ -787,6 +814,36 @@ def sitemap():
     <loc>https://quicksavevideos.com/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-instagram-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-tiktok-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-youtube-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-twitter-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-facebook-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-pinterest-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>"""
     return Response(xml, mimetype='application/xml')

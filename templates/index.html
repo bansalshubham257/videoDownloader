@@ -2990,7 +2990,15 @@
         <p class="footer-note">
             ⚠️ Only download content you own or have permission to download. Respect copyright and platform terms of service.
         </p>
-        <nav class="footer-links" aria-label="Company pages">
+        <nav class="footer-links" aria-label="Download guides">
+            <a href="{{ url_for('guide_instagram') }}">Instagram Download Guide</a>
+            <a href="{{ url_for('guide_tiktok') }}">TikTok Download Guide</a>
+            <a href="{{ url_for('guide_youtube') }}">YouTube Download Guide</a>
+            <a href="{{ url_for('guide_twitter') }}">Twitter/X Download Guide</a>
+            <a href="{{ url_for('guide_facebook') }}">Facebook Download Guide</a>
+            <a href="{{ url_for('guide_pinterest') }}">Pinterest Download Guide</a>
+        </nav>
+        <nav class="footer-links" aria-label="Company pages" style="margin-top:8px">
             <a href="{{ url_for('about') }}">About</a>
             <a href="{{ url_for('contact') }}">Contact</a>
             <a href="{{ url_for('privacy_policy') }}">Privacy Policy</a>

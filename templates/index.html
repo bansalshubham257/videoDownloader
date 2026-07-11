@@ -2793,10 +2793,15 @@
                 </div>
             </div>
 
-            <div class="copy-row caption">
-                <div id="s-caption" style="flex:1;"></div>
-                <button class="copy-btn" id="s-caption-copy" onclick="copyText(document.getElementById('s-caption').textContent,this)" title="Copy description">⎘ Copy</button>
+            <!-- Caption section - moved below media/download options -->
+            <div id="s-caption-section" class="copy-row caption" style="margin-top:20px;padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+                    <strong style="font-size:14px;">📝 Caption:</strong>
+                    <button class="copy-btn" id="s-caption-copy" onclick="copyText(document.getElementById('s-caption').textContent,this)" title="Copy description" style="flex-shrink:0;">⎘ Copy</button>
+                </div>
+                <p id="s-caption" style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;"></p>
             </div>
+        </section>
 
             <div class="ready-card" id="ready-card" style="display:none;">
                 <div class="rc-thumb"><img id="rc-thumb" src="" alt="" style="display:none;"></div>
@@ -2828,6 +2833,14 @@
             </div>
             <div id="carousel-note" style="font-size:14px;color:var(--text-primary);margin-bottom:12px;display:none;padding:12px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);line-height:1.6;"></div>
             <div class="carousel-grid" id="carousel-grid"></div>
+            <!-- Caption section for carousel posts - shown at bottom after all media items -->
+            <div id="carousel-caption-section" style="display:none;margin-top:24px;padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-md);">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+                    <strong style="font-size:14px;">📝 Caption:</strong>
+                    <button class="copy-btn" id="carousel-caption-copy-btn" onclick="copyText(document.getElementById('carousel-caption').textContent,this)" title="Copy caption" style="flex-shrink:0;">⎘ Copy</button>
+                </div>
+                <p id="carousel-caption" style="margin:0;font-size:14px;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;"></p>
+            </div>
         </section>
 
         <!-- ── Profile / Playlist grid ── -->
@@ -3759,6 +3772,17 @@
 
             window._carouselItems = data.items;
             const n = data.items.length;
+
+            // Display caption from the first item (all items in carousel share the same caption)
+            const caption = data.items[0]?.caption?.trim();
+            const captionSection = document.getElementById('carousel-caption-section');
+            const captionEl = document.getElementById('carousel-caption');
+            if (caption) {
+                captionEl.textContent = caption;
+                captionSection.style.display = 'block';
+            } else {
+                captionSection.style.display = 'none';
+            }
 
             // Album post — hide the single-result panel (its download button doesn't
             // cover multi-photo albums; the carousel grid is the right UI).

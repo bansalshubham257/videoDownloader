@@ -3764,7 +3764,20 @@
                 }
                 return;
             }
-            if (!data.items || (data.items.length <= 1 && !isStoryMode)) return; // single item — no carousel needed (except for stories)
+            if (!data.items || (data.items.length <= 1 && !isStoryMode)) {
+                // Single item (non-story) - show as single result with preview info
+                if (data.items && data.items.length === 1) {
+                    const item = data.items[0];
+                    showSingleResult({
+                        title: item.caption ? item.caption.substring(0, 80) : (item.is_video ? 'Instagram Video' : 'Instagram Photo'),
+                        uploader: '',
+                        thumbnail: item.thumbnail,
+                        description: item.caption,
+                        is_video: item.is_video
+                    });
+                }
+                return; // single item — no carousel needed (except for stories)
+            }
             if (!data.items || data.items.length === 0) {
                 if (isStoryMode) showMsg('No story items found.', 'error');
                 return;
@@ -3784,9 +3797,8 @@
                 captionSection.style.display = 'none';
             }
 
-            // Album post — hide the single-result panel (its download button doesn't
-            // cover multi-photo albums; the carousel grid is the right UI).
-            if (isAlbumPost) { hide('single-result'); hideMsg(); }
+            // Album post — hide the single-result panel only when showing carousel (multiple items)
+            if (isAlbumPost && n > 1) { hide('single-result'); hideMsg(); }
 
             document.getElementById('carousel-title').innerHTML =
                 `${isStoryMode ? '📖 Story Items' : (currentPlatform === 'twitter' ? '🐦 Tweet Media' : '📎 Album')} &nbsp;·&nbsp; <span style="color:var(--accent)">${n} items</span>`;
@@ -3802,6 +3814,40 @@
             if (isStoryMode) showMsg('Error loading story: ' + e.message, 'error');
             // else silently fail — carousel is optional enhancement
         }
+    }
+
+    /* ─── SINGLE RESULT DISPLAY ─────────────────────────────────────────────── */
+    function showSingleResult(preview) {
+        show('single-result');
+        document.getElementById('s-title').textContent = preview.title || 'Result';
+        document.getElementById('s-meta').textContent = preview.uploader ? '📺 ' + preview.uploader : '';
+        
+        // Set thumbnail
+        const thumb = document.getElementById('s-thumb');
+        if (preview.thumbnail) {
+            thumb.src = thumbUrl(preview.thumbnail);
+            thumb.style.display = 'block';
+        } else {
+            thumb.style.display = 'none';
+        }
+        document.getElementById('s-vc').style.display = preview.is_video ? 'flex' : 'none';
+        
+        // Show description/caption in the caption section
+        const captionEl = document.getElementById('s-caption');
+        const captionCopyBtn = document.getElementById('s-caption-copy');
+        if (preview.description) {
+            captionEl.textContent = preview.description;
+            captionEl.style.display = 'block';
+            if (captionCopyBtn) captionCopyBtn.style.display = 'inline-block';
+        } else {
+            captionEl.style.display = 'none';
+            if (captionCopyBtn) captionCopyBtn.style.display = 'none';
+        }
+        
+        // Show download options based on platform
+        updateOptionsForPlatform(currentPlatform);
+        
+        setTimeout(() => document.getElementById('single-result').scrollIntoView({ behavior: 'smooth' }), 80);
     }
 
     function _carouselItemHTML(item, idx, total) {

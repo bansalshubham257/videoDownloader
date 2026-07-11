@@ -196,17 +196,19 @@
 
                     <Button
                         android:id="@+id/btnCopyCaption"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="32dp"
-                        android:layout_marginStart="8dp"
-                        android:paddingStart="16dp"
-                        android:paddingEnd="16dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:layout_marginEnd="12dp"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
                         android:backgroundTint="@color/primary"
                         android:text="Copy"
                         android:textAllCaps="false"
                         android:textColor="@color/white"
                         android:textSize="12sp"
-                        android:minWidth="72dp" />
+                        android:minWidth="80dp" />
                 </LinearLayout>
 
                 <TextView

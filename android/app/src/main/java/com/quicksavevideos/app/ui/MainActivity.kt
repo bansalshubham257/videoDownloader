@@ -149,6 +149,8 @@ class MainActivity : AppCompatActivity() {
 
         setupUrlTextWatcher()
 
+        previewCopyBtn.setOnClickListener { copyCaption() }
+
         requestAllPermissions()
     }
 

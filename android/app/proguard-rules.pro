@@ -1,0 +1,3 @@
+-keepclassmembers class * implements java.io.Serializable { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">QuickSaveVideos</string>
+    <string name="overlay_title">QuickSave Overlay</string>
+    <string name="overlay_text">Tap to download copied video</string>
+    <string name="notification_channel_name">Download Status</string>
+    <string name="notification_channel_desc">Shows video download progress</string>
+    <string name="download_started">Download started…</string>
+    <string name="download_complete">Video saved to gallery</string>
+    <string name="download_failed">Download failed</string>
+    <string name="no_url">No video link found in clipboard</string>
+    <string name="permission_overlay_title">Enable Overlay Permission</string>
+    <string name="permission_overlay_desc">Allow QuickSaveVideos to show a floating bubble for one-tap downloads</string>
+    <string name="permission_notification_title">Enable Notifications</string>
+    <string name="permission_notification_desc">Notifications show download progress and completion status</string>
+    <string name="btn_start_overlay">Start Overlay</string>
+    <string name="btn_stop_overlay">Stop Overlay</string>
+    <string name="overlay_active">Overlay is active</string>
+    <string name="overlay_inactive">Overlay is inactive</string>
+    <string name="clipboard_label">Clipboard URL</string>
+    <string name="btn_download">Download</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="saving_gallery">Saving to gallery…</string>
+    <string name="invalid_url">Please copy a valid video URL first</string>
+    <string name="server_url_label">Server URL</string>
+    <string name="server_url_hint">https://quicksavevideos.com</string>
+    <string name="download_success">Downloaded: %s</string>
+    <string name="section_overlay">Overlay Mode</string>
+    <string name="section_download">Download Video</string>
+    <string name="url_hint">Paste video URL (Instagram, YouTube, TikTok, etc.)</string>
+    <string name="btn_download_now">Download Now</string>
+    <string name="downloading">Downloading…</string>
+    <string name="downloading_progress">Downloading… %d%%</string>
+    <string name="dark_mode">Dark Theme</string>
+    <string name="terms_of_service">Terms of Service</string>
+    <string name="privacy_policy">Privacy Policy</string>
+</resources>

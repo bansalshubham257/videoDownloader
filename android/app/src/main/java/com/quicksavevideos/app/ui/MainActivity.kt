@@ -108,7 +108,6 @@ class MainActivity : AppCompatActivity() {
 
         btnToggle = findViewById(R.id.btnToggleOverlay)
         tvStatus = findViewById(R.id.tvStatus)
-        etServerUrl = findViewById(R.id.etServerUrl)
         etUrl = findViewById(R.id.etUrl)
         urlInputLayout = findViewById(R.id.urlInputLayout)
         btnDownloadNow = findViewById(R.id.btnDownloadNow)
@@ -127,67 +126,6 @@ class MainActivity : AppCompatActivity() {
         previewCopyBtn = findViewById(R.id.btnCopyCaption)
         btnDownloadFromPreview = findViewById(R.id.btnDownloadFromPreview)
         captionSection = findViewById(R.id.captionSection)
-        btnClearUrl = findViewById(R.id.btnClearUrl)
-
-        loadServerUrl()
-
-        switchDarkMode.isChecked = prefs.getBoolean("dark_mode", false)
-        switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("dark_mode", isChecked).apply()
-            AppCompatDelegate.setDefaultNightMode(
-                if (isChecked) AppCompatDelegate.MODE_NIGHT_YES
-                else AppCompatDelegate.MODE_NIGHT_NO
-            )
-        }
-
-        val clipboardMode = prefs.getString("clipboard_mode", "always") ?: "always"
-        switchClipboardAsk.isChecked = clipboardMode == "ask"
-        switchClipboardAsk.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putString("clipboard_mode", if (isChecked) "ask" else "always").apply()
-        }
-
-        findViewById<TextView>(R.id.tvTerms).setOnClickListener {
-            startActivity(Intent(this, InfoPageActivity::class.java).putExtra("page", "terms"))
-        }
-        findViewById<TextView>(R.id.tvPrivacy).setOnClickListener {
-            startActivity(Intent(this, InfoPageActivity::class.java).putExtra("page", "privacy"))
-        }
-
-        btnDownloadNow.setOnClickListener { onDownloadNow() }
-        btnDownloadFromPreview.setOnClickListener { onDownloadNow() }
-        btnToggle.setOnClickListener { onToggleOverlay() }
-        btnClearUrl.setOnClickListener { clearUrl() }
-        previewCopyBtn.setOnClickListener { copyCaption() }
-
-        // URL text change listener for preview
-        etUrl.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val url = s.toString().trim()
-                btnClearUrl.visibility = if (url.isNotEmpty()) View.VISIBLE else View.GONE
-            }
-            override fun afterTextChanged(s: Editable?) {
-                val url = s.toString().trim()
-                if (url.startsWith("http")) {
-                    fetchPreviewDebounced(url)
-                } else {
-                    hidePreview()
-                }
-            }
-        })
-
-        // Copy caption button
-        previewCopyBtn.setOnClickListener {
-            val caption = previewDescription.text.toString()
-            if (caption.isNotBlank()) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("Caption", caption)
-                clipboard.setPrimaryClip(clip)
-                Toast.makeText(this, "Caption copied!", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        loadServerUrl()
 
         loadBannerAd()
         updateUI()
@@ -219,7 +157,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showClipboardConfirmDialog() {
-        val serverUrl = intent?.getStringExtra("server_url") ?: getServerUrl()
+        val serverUrl = intent?.getStringExtra("server_url") ?: "https://quicksavevideos.com"
         val dialog = BottomSheetDialog(this)
         val view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_clipboard, null)
         dialog.setContentView(view)
@@ -334,7 +272,7 @@ class MainActivity : AppCompatActivity() {
         
         GlobalScope.launch(Dispatchers.IO) {
             try {
-                val preview = downloadManager.fetchPreview(getServerUrl(), url)
+                val preview = downloadManager.fetchPreview("https://quicksavevideos.com", url)
                 runOnUiThread { showPreview(preview) }
             } catch (e: Exception) {
                 runOnUiThread { hidePreview() }
@@ -385,7 +323,6 @@ private fun hidePreview() {
     private fun clearUrl() {
         etUrl.text?.clear()
         hidePreview()
-        urlInputLayout.endIconDrawable?.setVisible(false, false)
         etUrl.requestFocus()
     }
 
@@ -409,7 +346,6 @@ private fun hidePreview() {
             return
         }
 
-        saveServerUrl()
         tvDownloadStatus.visibility = View.VISIBLE
         tvDownloadStatus.text = "Starting download..."
         progressBarDownload.visibility = View.VISIBLE
@@ -422,7 +358,7 @@ private fun hidePreview() {
 
         GlobalScope.launch(Dispatchers.IO) {
             val result = downloadManager.downloadVideo(
-                serverUrl = getServerUrl(),
+                serverUrl = "https://quicksavevideos.com",
                 videoUrl = url,
                 onProgress = { progress ->
                     runOnUiThread {
@@ -489,7 +425,6 @@ private fun hidePreview() {
             activity = this,
             onEarned = {
                 runOnUiThread {
-                    saveServerUrl()
                     OverlayService.start(this@MainActivity)
                     updateUI()
                     Toast.makeText(this@MainActivity, "Overlay activated", Toast.LENGTH_SHORT).show()
@@ -498,7 +433,6 @@ private fun hidePreview() {
             onDismissed = {
                 runOnUiThread {
                     if (!OverlayService.isRunning(this@MainActivity)) {
-                        saveServerUrl()
                         OverlayService.start(this@MainActivity)
                         updateUI()
                         Toast.makeText(this@MainActivity, "Overlay activated", Toast.LENGTH_SHORT).show()
@@ -530,24 +464,6 @@ private fun hidePreview() {
             tvStatus.text = getString(R.string.overlay_inactive)
             tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
         }
-    }
-
-    // ── Helpers ─────────────────────────────────────────────────────────
-
-    private fun loadServerUrl() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val url = prefs.getString("server_url", "https://quicksavevideos.com") ?: "https://quicksavevideos.com"
-        etServerUrl.setText(url)
-    }
-
-    private fun saveServerUrl() {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString("server_url", etServerUrl.text?.toString()?.trim() ?: "https://quicksavevideos.com").apply()
-    }
-
-    private fun getServerUrl(): String {
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString("server_url", "https://quicksavevideos.com") ?: "https://quicksavevideos.com"
     }
 
     private fun buildProgressNotification(text: String, progress: Int): android.app.Notification {

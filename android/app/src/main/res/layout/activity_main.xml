@@ -76,7 +76,11 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:hint="Video URL"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:endIconMode="custom"
+            app:endIconDrawable="@drawable/ic_clear"
+            app:endIconTint="@color/text_secondary"
+            app:endIconContentDescription="Clear">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/etUrl"
@@ -85,22 +89,6 @@
                 android:hint="@string/url_hint"
                 android:inputType="textUri"
                 android:textColor="@color/text_primary" />
-
-            <!-- Clear button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnClearUrl"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="8dp"
-                android:icon="@drawable/ic_clear"
-                app:iconSize="20dp"
-                android:iconTint="@color/text_secondary"
-                android:minWidth="0dp"
-                android:padding="8dp"
-                android:text=""
-                android:visibility="gone"
-                style="@style/Widget.MaterialComponents.Button.TextButton.Icon" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -198,11 +186,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="32dp"
                         android:layout_marginStart="8dp"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp"
                         android:backgroundTint="@color/primary"
                         android:text="Copy"
                         android:textAllCaps="false"
                         android:textColor="@color/white"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        android:minWidth="72dp" />
                 </LinearLayout>
 
                 <TextView
@@ -276,29 +267,6 @@
             android:text="@string/overlay_inactive"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginVertical="24dp"
-            android:background="@color/border" />
-
-        <!-- Server URL Setting -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/server_url_label"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etServerUrl"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textUri"
-                android:text="https://quicksavevideos.com"
-                android:textColor="@color/text_primary" />
-
-        </com.google.android.material.textfield.TextInputLayout>
 
         <View
             android:layout_width="match_parent"

@@ -77,8 +77,7 @@
             android:layout_marginTop="12dp"
             android:hint="Video URL"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-            app:endIconMode="custom"
-            app:endIconDrawable="@drawable/ic_clear"
+            app:endIconMode="clear_text"
             app:endIconTint="@color/text_secondary"
             app:endIconContentDescription="Clear">
 
@@ -91,6 +90,20 @@
                 android:textColor="@color/text_primary" />
 
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- Paste button (shown when URL is empty) -->
+        <Button
+            android:id="@+id/btnPasteUrl"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginTop="8dp"
+            android:layout_gravity="end"
+            android:backgroundTint="@color/primary"
+            android:text="Paste"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:visibility="gone" />
 
         <Button
             android:id="@+id/btnDownloadNow"

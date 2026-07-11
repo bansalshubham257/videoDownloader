@@ -76,7 +76,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var previewCopyBtn: MaterialButton
     private lateinit var btnDownloadFromPreview: Button
     private lateinit var captionSection: LinearLayout
-    private lateinit var btnClearUrl: MaterialButton
+    private lateinit var btnPasteUrl: Button
     
     // State
     private var currentPreviewUrl: String? = null
@@ -130,6 +130,25 @@ class MainActivity : AppCompatActivity() {
         loadBannerAd()
         updateUI()
 
+        btnPasteUrl = findViewById<Button>(R.id.btnPasteUrl)
+        btnPasteUrl.setOnClickListener {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val primaryClip = clipboard.primaryClip
+            if (primaryClip != null && primaryClip.itemCount > 0) {
+                val pasteText = primaryClip.getItemAt(0).text.toString().trim()
+                if (pasteText.startsWith("http")) {
+                    etUrl.text?.clear()
+                    etUrl.append(pasteText)
+                } else {
+                    Toast.makeText(this, "No valid URL in clipboard", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        setupUrlTextWatcher()
+
         requestAllPermissions()
     }
 
@@ -146,6 +165,27 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         clipboardIntentHandled = false
         handleIntent(intent)
+    }
+
+    // URL text change listener for preview and paste button
+    private fun setupUrlTextWatcher() {
+        etUrl.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val url = s.toString().trim()
+                if (url.isNotEmpty()) {
+                    btnPasteUrl.visibility = View.GONE
+                } else {
+                    btnPasteUrl.visibility = View.VISIBLE
+                }
+                if (url.startsWith("http")) {
+                    fetchPreviewDebounced(url)
+                } else {
+                    hidePreview()
+                }
+            }
+        })
     }
 
     private fun handleIntent(intent: Intent?) {

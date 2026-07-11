@@ -236,6 +236,27 @@ function handleDownloadSuccess(data, url) {
     downloadLink.href = `/api/file/${encodeURIComponent(data.filename)}`;
     downloadLink.download = data.filename;
 
+    // Display caption in single-result section if available
+    const captionEl = document.getElementById('s-caption');
+    const captionCopyBtn = document.getElementById('s-caption-copy');
+    if (data.description) {
+        captionEl.textContent = data.description;
+        captionEl.style.display = 'block';
+        if (captionCopyBtn) captionCopyBtn.style.display = 'inline-block';
+    } else {
+        captionEl.style.display = 'none';
+        if (captionCopyBtn) captionCopyBtn.style.display = 'none';
+    }
+
+    // Also set thumbnail for single result if available
+    const thumbEl = document.getElementById('s-thumb');
+    if (data.thumbnail) {
+        thumbEl.src = data.thumbnail;
+        thumbEl.style.display = 'block';
+        const vc = document.getElementById('s-vc');
+        if (vc) vc.style.display = 'flex';
+    }
+
     // Show result
     resultDiv.classList.remove('hidden');
     showMessage('✅ Download successful! Click the button below to save.', 'success');

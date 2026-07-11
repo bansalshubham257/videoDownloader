@@ -1333,7 +1333,12 @@ def extract_preview_info(url):
                         preview_data['duration'] = f"{int(dur)//60}:{int(dur)%60:02d}"
 
                     logger.info(f"✅ yt-dlp preview: thumbnail={'yes' if preview_data.get('thumbnail') else 'no'}, desc_len={len(preview_data.get('description',''))}")
-                    return preview_data
+
+                    # For Instagram, don't return yet - try oEmbed to get the actual caption
+                    if 'instagram.com' in url and ('/reel/' in url or '/p/' in url or '/tv/' in url):
+                        logger.info("🔍 Instagram post - will try oEmbed for actual caption")
+                    else:
+                        return preview_data
         except Exception as e:
             if is_youtube_url(url) and is_youtube_bot_challenge_error(str(e)):
                 return {
@@ -1343,6 +1348,27 @@ def extract_preview_info(url):
                     )
                 }
             logger.warning(f"⚠️ yt-dlp preview failed: {e}")
+
+    # ── Method 1b: Instagram oEmbed for actual caption (for Instagram posts only) ──
+    if 'instagram.com' in url and ('/reel/' in url or '/p/' in url or '/tv/' in url):
+        try:
+            logger.info("🔍 Trying Instagram oEmbed for caption...")
+            shortcode = _extract_shortcode(url)
+            if shortcode:
+                oembed_url = f'https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/p/{shortcode}/&hidecaption=0'
+                headers = {'User-Agent': get_random_user_agent()}
+                oembed_resp = requests.get(oembed_url, headers=headers, timeout=10)
+                if oembed_resp.status_code == 200:
+                    oembed_data = oembed_resp.json()
+                    # oEmbed returns the full caption in 'title' field
+                    if oembed_data.get('title'):
+                        preview_data['description'] = oembed_data['title']
+                        logger.info(f"✅ oEmbed caption found: {oembed_data['title'][:80]}...")
+                    if oembed_data.get('thumbnail_url') and not preview_data.get('thumbnail'):
+                        preview_data['thumbnail'] = oembed_data['thumbnail_url']
+                        logger.info("✅ oEmbed thumbnail found")
+        except Exception as e:
+            logger.warning(f"⚠️ oEmbed preview failed: {e}")
 
     # ── Method 2: HTML scraping (og: meta tags) ──
     try:
@@ -1480,10 +1506,27 @@ def extract_preview_info(url):
         except Exception as e:
             logger.warning(f"⚠️ Instagram embed preview failed: {e}")
 
+    # ── Method 5: Instagram page source extraction (public posts, no auth) ──
+    if ('instagram.com/reel/' in url or 'instagram.com/p/' in url or 'instagram.com/tv/' in url) and not preview_data:
+        try:
+            logger.info("🔍 Trying Instagram page source extraction for preview...")
+            carousel_items = _fetch_carousel_from_page_source(url)
+            if carousel_items:
+                first_item = carousel_items[0]
+                preview_data['thumbnail'] = first_item.get('thumbnail', '')
+                preview_data['description'] = first_item.get('caption', '')
+                preview_data['title'] = (first_item.get('caption', '')[:80]
+                                         if first_item.get('caption') else 'Instagram Post')
+                preview_data['is_video'] = first_item.get('is_video', False)
+                preview_data['type'] = 'video' if preview_data['is_video'] else 'photo'
+                logger.info("✅ Page source extraction: thumbnail and caption found")
+        except Exception as e:
+            logger.warning(f"⚠️ Page source preview extraction failed: {e}")
+
     if preview_data:
         return preview_data
 
-    # ── Method 5: Instagram Story / Highlight preview ─────────────────────
+    # ── Method 6: Instagram Story / Highlight preview ─────────────────────
     if 'instagram.com' in url and '/stories/' in url:
         try:
             logger.info("🔍 Trying Instagram story/highlight preview...")
@@ -1608,7 +1651,7 @@ def _fetch_carousel_from_page_source(url):
     Fetch the Instagram post page HTML and extract all carousel/album media items
     from the embedded JSON blobs (data-sjs script tags).
     Works for PUBLIC posts without any authentication/session cookie.
-    Returns list of {index, url, thumbnail, is_video, ext} dicts.
+    Returns list of {index, url, thumbnail, is_video, ext, caption} dicts.
     """
     import re
     import json as _json
@@ -1618,6 +1661,7 @@ def _fetch_carousel_from_page_source(url):
         return []
 
     items = []
+    caption = ''
     try:
         post_url = f'https://www.instagram.com/p/{shortcode}/'
 
@@ -1738,6 +1782,34 @@ def _fetch_carousel_from_page_source(url):
                     logger.warning(f"⚠️ Carousel API fallback failed: {_api_e}")
             return []
 
+        # ── Extract caption from media_root ──────────────────────────────
+        # Instagram GraphQL stores caption in edge_media_to_caption.edges[0].node.text
+        cap_edges = media_root.get('edge_media_to_caption', {}).get('edges', [])
+        if cap_edges:
+            caption = cap_edges[0]['node']['text']
+        # Fallback: private API format has caption directly
+        elif media_root.get('caption'):
+            cap_obj = media_root.get('caption')
+            if isinstance(cap_obj, dict):
+                caption = cap_obj.get('text', '')
+            elif isinstance(cap_obj, str):
+                caption = cap_obj
+
+        # ── Fallback: Try oEmbed API for caption if not found ────────────────
+        if not caption:
+            try:
+                oembed_url = f'https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/p/{shortcode}/&hidecaption=0'
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+                oembed_resp = requests.get(oembed_url, headers=headers, timeout=10)
+                if oembed_resp.status_code == 200:
+                    oembed_data = oembed_resp.json()
+                    # oEmbed returns caption in 'title' field
+                    if oembed_data.get('title'):
+                        caption = oembed_data['title']
+                        logger.info(f"✅ Got caption from oEmbed API: {caption[:50]}...")
+            except Exception as e:
+                logger.warning(f"⚠️ oEmbed caption fetch failed: {e}")
+
         # ── Extract carousel items ───────────────────────────────────────
         carousel = media_root.get('carousel_media', [])
         if carousel:
@@ -1750,14 +1822,14 @@ def _fetch_carousel_from_page_source(url):
                     video_url = vids[0]['url'] if vids else ''
                     if video_url:
                         items.append({'index': idx, 'url': video_url,
-                                      'thumbnail': thumb, 'is_video': True, 'ext': 'mp4'})
+                                      'thumbnail': thumb, 'is_video': True, 'ext': 'mp4', 'caption': caption})
                     elif thumb:
                         items.append({'index': idx, 'url': thumb,
-                                      'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
+                                      'thumbnail': thumb, 'is_video': False, 'ext': 'jpg', 'caption': caption})
                 else:  # photo
                     if thumb:
                         items.append({'index': idx, 'url': thumb,
-                                      'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
+                                      'thumbnail': thumb, 'is_video': False, 'ext': 'jpg', 'caption': caption})
 
         elif media_root.get('media_type') == 2:  # Single video root
             vids = media_root.get('video_versions', [])
@@ -1765,13 +1837,13 @@ def _fetch_carousel_from_page_source(url):
                 tc = media_root.get('image_versions2', {}).get('candidates', [])
                 items.append({'index': 0, 'url': vids[0]['url'],
                               'thumbnail': tc[0]['url'] if tc else '',
-                              'is_video': True, 'ext': 'mp4'})
+                              'is_video': True, 'ext': 'mp4', 'caption': caption})
 
         else:  # Single photo root
             tc = media_root.get('image_versions2', {}).get('candidates', [])
             if tc:
                 items.append({'index': 0, 'url': tc[0]['url'],
-                              'thumbnail': tc[0]['url'], 'is_video': False, 'ext': 'jpg'})
+                              'thumbnail': tc[0]['url'], 'is_video': False, 'ext': 'jpg', 'caption': caption})
 
         if items:
             logger.info(f"✅ Carousel: {len(items)} item(s) via page source scraping")
@@ -2616,7 +2688,7 @@ def _fetch_twitter_media_items(url):
 def get_carousel():
     """
     Return all media items of an Instagram post/story OR a Twitter/X tweet.
-    Each item: {index, url, thumbnail, is_video, ext}
+    Each item: {index, url, thumbnail, is_video, ext, caption}
     """
     data = request.json or {}
     url  = data.get('url', '').strip()
@@ -2688,6 +2760,11 @@ def get_carousel():
             ),
             'needs_cookie': needs_cookie,
         }), 400
+
+    # Include caption in response if available
+    for item in items:
+        if 'caption' in item:
+            item['caption'] = item['caption']
 
     return jsonify({'success': True, 'items': items, 'count': len(items)})
 
@@ -3765,7 +3842,7 @@ def _extract_shortcode(url):
             return url.split(seg)[1].split('/')[0].split('?')[0]
     return None
 
-def _download_cdn_image(img_url, shortcode):
+def _download_cdn_image(img_url, shortcode, thumbnail='', description=''):
     """Fetch an image from Instagram CDN with proper Referer + session cookie headers."""
     try:
         cookies = load_cookies()
@@ -3799,6 +3876,8 @@ def _download_cdn_image(img_url, shortcode):
                 'success':   True,
                 'filename':  os.path.basename(filename),
                 'file_size': f"{file_size / (1024*1024):.2f} MB",
+                'thumbnail': thumbnail or img_url,
+                'description': description,
             })
         return None
     except Exception as e:
@@ -4110,8 +4189,13 @@ def download_instagram_photo(url):
                 if candidates:
                     candidates.sort(key=lambda x: x.get('width', 0) * x.get('height', 0), reverse=True)
                     img_url = candidates[0]['url']
+                    # Extract caption if available
+                    caption = ''
+                    cap_obj = item.get('caption')
+                    if cap_obj and isinstance(cap_obj, dict):
+                        caption = cap_obj.get('text', '')
                     logger.info(f"   Internal API → {candidates[0].get('width')}×{candidates[0].get('height')} image")
-                    result = _download_cdn_image(img_url, shortcode)
+                    result = _download_cdn_image(img_url, shortcode, thumbnail=img_url, description=caption)
                     if result:
                         return result
         except Exception as e:
@@ -4123,7 +4207,7 @@ def download_instagram_photo(url):
     try:
         img_url = _fetch_image_from_embed(shortcode)
         if img_url:
-            result = _download_cdn_image(img_url, shortcode)
+            result = _download_cdn_image(img_url, shortcode, thumbnail=img_url)
             if result:
                 return result
     except Exception as e:
@@ -4133,7 +4217,7 @@ def download_instagram_photo(url):
     try:
         img_url = _fetch_oembed_thumbnail(shortcode)
         if img_url:
-            result = _download_cdn_image(img_url, shortcode)
+            result = _download_cdn_image(img_url, shortcode, thumbnail=img_url)
             if result:
                 return result
     except Exception as e:
@@ -4195,6 +4279,14 @@ def download_with_instagrapi(url, content_type='both'):
 
         media = client.media_info(media_pk)
 
+        # Extract thumbnail and description from media info
+        thumbnail = ''
+        description = ''
+        if hasattr(media, 'thumbnail_url') and media.thumbnail_url:
+            thumbnail = str(media.thumbnail_url)
+        if hasattr(media, 'caption_text') and media.caption_text:
+            description = media.caption_text
+
         if media.is_video:
             logger.info(f"📹 Video detected: {shortcode}")
             if content_type == 'audio':
@@ -4228,6 +4320,8 @@ def download_with_instagrapi(url, content_type='both'):
                 'success':   True,
                 'filename':  os.path.basename(filename),
                 'file_size': f"{file_size/(1024*1024):.2f} MB",
+                'thumbnail': thumbnail,
+                'description': description,
             })
         return None
 
@@ -4290,10 +4384,17 @@ def download_with_ytdlp(url, format_id='best', content_type='both'):
                 if os.path.exists(filename):
                     file_size = os.path.getsize(filename)
                     logger.info(f"✅ Downloaded: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                    
+                    # Extract thumbnail and description from info
+                    thumbnail = info.get('thumbnail', '')
+                    description = info.get('description', '')
+                    
                     return jsonify({
                         'success':   True,
                         'filename':  os.path.basename(filename),
                         'file_size': f"{file_size/(1024*1024):.2f} MB",
+                        'thumbnail': thumbnail,
+                        'description': description,
                     })
         return None
 

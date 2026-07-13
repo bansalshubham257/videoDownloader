@@ -3188,20 +3188,16 @@
             if (type === 'tiktok_video') {
                 currentPlatform = 'tiktok';
                 await loadSinglePost(url, 'tiktok');
-            } else if (type === 'tiktok_profile') {
-                showMsg('⚠️ TikTok profile pages are not supported. Please paste a direct video link — it should contain "/video/" in the URL.', 'error');
+            } else if (type === 'tiktok_profile' || type === 'facebook_profile' || type === 'pinterest_profile' || type === 'twitter_profile') {
+                // Allow download from any website — route profiles to generic downloader
+                currentPlatform = 'generic';
+                await loadSinglePost(url, 'generic');
             } else if (type === 'facebook_video') {
                 currentPlatform = 'facebook';
                 await loadSinglePost(url, 'facebook');
-            } else if (type === 'facebook_profile') {
-                showMsg('⚠️ Facebook profile/page links are not supported. Please paste a direct video link containing "/videos/", "/watch", "/reel/", or use fb.watch', 'error');
             } else if (type === 'pinterest_post') {
                 currentPlatform = 'pinterest';
                 await loadSinglePost(url, 'pinterest');
-            } else if (type === 'pinterest_profile') {
-                showMsg('⚠️ Pinterest profile/board pages are not supported. Please paste a direct pin link — it should contain "/pin/" in the URL.', 'error');
-            } else if (type === 'twitter_profile') {
-                showMsg('⚠️ Twitter/X profile pages are not supported. Please paste a direct tweet link — it should contain "/status/" in the URL.', 'error');
             } else if (type === 'twitter_video') {
                 currentPlatform = 'twitter';
                 await loadSinglePost(url, 'twitter');
@@ -3548,10 +3544,13 @@
 
         // Show description separately from title
         const captionEl = document.getElementById('s-caption');
+        const captionSection = document.getElementById('s-caption-section');
         const desc = p.description || '';
         const title = p.title || '';
-        captionEl.textContent = (desc && desc !== title) ? desc : '';
-        document.getElementById('s-caption-copy').style.display = (desc && desc !== title) ? 'inline-flex' : 'none';
+        const hasCaption = desc && desc !== title;
+        captionEl.textContent = hasCaption ? desc : '';
+        document.getElementById('s-caption-copy').style.display = hasCaption ? 'inline-flex' : 'none';
+        captionSection.style.display = hasCaption ? 'flex' : 'none';
 
         // Text-only tweet — disable download button and show notice
         const dlBtn  = document.getElementById('s-dl-btn');
@@ -3834,14 +3833,17 @@
         
         // Show description/caption in the caption section
         const captionEl = document.getElementById('s-caption');
+        const captionSection = document.getElementById('s-caption-section');
         const captionCopyBtn = document.getElementById('s-caption-copy');
         if (preview.description) {
             captionEl.textContent = preview.description;
             captionEl.style.display = 'block';
             if (captionCopyBtn) captionCopyBtn.style.display = 'inline-block';
+            captionSection.style.display = 'flex';
         } else {
             captionEl.style.display = 'none';
             if (captionCopyBtn) captionCopyBtn.style.display = 'none';
+            captionSection.style.display = 'none';
         }
         
         // Show download options based on platform

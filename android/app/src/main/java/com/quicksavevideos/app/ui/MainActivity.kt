@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private var previewFetchJob: kotlinx.coroutines.Job? = null
     private var clipboardIntentHandled = false
     private var permissionQueue = mutableListOf<() -> Unit>()
+    private var pendingOverlayStart = false
 
     companion object {
         private const val PREFS_NAME = "quicksave_prefs"
@@ -126,6 +127,8 @@ class MainActivity : AppCompatActivity() {
         previewCopyBtn = findViewById(R.id.btnCopyCaption)
         btnDownloadFromPreview = findViewById(R.id.btnDownloadFromPreview)
         captionSection = findViewById(R.id.captionSection)
+
+        btnToggle.setOnClickListener { onToggleOverlay() }
 
         loadBannerAd()
         updateUI()
@@ -283,6 +286,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkAndRequestNextPermission() {
         if (permissionQueue.isEmpty()) {
+            if (pendingOverlayStart) {
+                pendingOverlayStart = false
+                if (areAllPermissionsGranted()) {
+                    showRewardedAdThenStart()
+                } else {
+                    Toast.makeText(this, "All required permissions must be granted to use the overlay.", Toast.LENGTH_LONG).show()
+                }
+            }
             return
         }
         permissionQueue.removeAt(0).invoke()
@@ -456,6 +467,7 @@ private fun hidePreview() {
             if (areAllPermissionsGranted()) {
                 showRewardedAdThenStart()
             } else {
+                pendingOverlayStart = true
                 requestAllPermissions()
             }
         }

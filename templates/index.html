@@ -3573,7 +3573,16 @@
             } else {
                 previewData = null;
                 showSinglePreview({ thumbnail: null, description: '', is_video: true });
-                showMsg('Preview not available — you can still download.', 'info');
+                const errMsg = data.error || 'Preview not available — you can still download.';
+                if (errMsg.toLowerCase().includes('age') || errMsg.toLowerCase().includes('session cookie')) {
+                    showMsgHtml(
+                        errMsg +
+                        ' <button onclick="toggleSettings();document.getElementById(\'settings-panel\').scrollIntoView({behavior:\'smooth\'})" style="margin-left:8px;padding:4px 12px;font-size:12px;background:#3d82f7;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚙️ Login</button>',
+                        'info'
+                    );
+                } else {
+                    showMsg(errMsg, 'info');
+                }
             }
         } catch(e) {
             previewData = null;

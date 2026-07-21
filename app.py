@@ -1396,6 +1396,16 @@ def get_preview():
         logger.error(f"❌ Error in get_preview: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+def _detect_instagram_age_gate(html):
+    """Check if the Instagram page HTML indicates an age-gated/restricted post."""
+    if '"failure_reason":"MA"' in html or '"failure_reason": "MA"' in html:
+        return True
+    m = re.search(r'"restricted_age"\s*:\s*(\d+)', html)
+    if m and int(m.group(1)) > 0:
+        return True
+    return False
+
+
 def extract_preview_info(url):
     """Extract preview information from Instagram URL using multiple methods"""
     import re
@@ -1479,6 +1489,18 @@ def extract_preview_info(url):
                     if oembed_data.get('thumbnail_url') and not preview_data.get('thumbnail'):
                         preview_data['thumbnail'] = oembed_data['thumbnail_url']
                         logger.info("✅ oEmbed thumbnail found")
+                elif oembed_resp.status_code == 400:
+                    try:
+                        err_body = oembed_resp.json()
+                        if err_body.get('gating_type') or 'geoblock' in str(err_body):
+                            logger.info("🔒 Instagram age-gated post detected via oEmbed")
+                            preview_data['_error'] = (
+                                'This Instagram post is age-restricted. '
+                                'Add your Instagram session cookie in ⚙️ Settings to view preview and download.'
+                            )
+                            preview_data['needs_login'] = True
+                    except Exception:
+                        pass
         except Exception as e:
             logger.warning(f"⚠️ oEmbed preview failed: {e}")
 
@@ -4345,6 +4367,27 @@ def try_download_methods(url, quality='best', content_type='both'):
     """
     is_video_url = '/reel/' in url or '/tv/' in url
     shortcode = _extract_shortcode(url)
+
+    # Pre-check: skip all methods if content is age-gated and no cookies available
+    if 'instagram.com' in url and not cookies_are_set() and shortcode and ('/reel/' in url or '/p/' in url):
+        try:
+            check_headers = {'User-Agent': get_random_user_agent()}
+            cr = requests.get(
+                f'https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/p/{shortcode}/&hidecaption=0',
+                headers=check_headers, timeout=10
+            )
+            if cr.status_code == 400:
+                err_body = cr.json()
+                if err_body.get('gating_type') or 'geoblock' in str(err_body):
+                    logger.info("🔒 Instagram age-gated post detected (oEmbed) — returning auth-needed error")
+                    return jsonify({
+                        'error': (
+                            'This Instagram post is age-restricted. '
+                            'Add your Instagram session cookie in ⚙️ Settings to download.'
+                        )
+                    }), 400
+        except Exception:
+            pass
 
     # ── 1. yt-dlp ────────────────────────────────────────────────────────
     if YTDLP_AVAILABLE:

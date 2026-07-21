@@ -3841,8 +3841,9 @@
                 return;
             }
             if (!data.items || (data.items.length <= 1 && !isStoryMode)) {
-                // Single item (non-story) - show as single result with preview info
-                if (data.items && data.items.length === 1) {
+                // Single item (non-story) — don't overwrite preview; loadSinglePost already showed it
+                // Only overwrite for story mode since stories have no single-post preview
+                if (isStoryMode && data.items && data.items.length === 1) {
                     const item = data.items[0];
                     showSingleResult({
                         title: item.caption ? item.caption.substring(0, 80) : (item.is_video ? 'Instagram Video' : 'Instagram Photo'),

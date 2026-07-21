@@ -253,16 +253,28 @@ def load_all_ig_cookies():
     """
     Return Instagram session cookies from ALL available sources, in priority order:
       1. /tmp/instagram_cookies.json  (set explicitly by the user via Settings UI)
-      2. /tmp/instagram_cookies.txt   (Netscape file written by save_cookies)
-      3. /tmp/ytdlp_cookies.txt       (bootstrapped from YTDLP_COOKIES_TEXT / YTDLP_COOKIES_B64 env vars)
-      4. YTDLP_COOKIE_FILE env var    (user-supplied cookie file path)
+      2. INSTAGRAM_SESSIONID / INSTAGRAM_CSRFTOKEN / INSTAGRAM_DS_USER_ID env vars
+      3. /tmp/instagram_cookies.txt   (Netscape file written by save_cookies)
+      4. /tmp/ytdlp_cookies.txt       (bootstrapped from YTDLP_COOKIES_TEXT / YTDLP_COOKIES_B64 env vars)
+      5. YTDLP_COOKIE_FILE env var    (user-supplied cookie file path)
     """
     # 1. JSON file (user-set via UI) — highest priority
     cookies = load_cookies()
     if cookies.get('sessionid'):
         return cookies
 
-    # 2. Netscape file written by the UI save flow
+    # 2. Environment variables (Railway / server env) — next priority
+    env_sessionid = os.environ.get('INSTAGRAM_SESSIONID', '').strip()
+    if env_sessionid:
+        cookies = {
+            'sessionid': env_sessionid,
+            'csrftoken': os.environ.get('INSTAGRAM_CSRFTOKEN', '').strip(),
+            'ds_user_id': os.environ.get('INSTAGRAM_DS_USER_ID', '').strip(),
+        }
+        logger.info("✅ Using Instagram cookies from environment variables")
+        return cookies
+
+    # 3. Netscape file written by the UI save flow
     for path in (NETSCAPE_COOKIES_FILE, YTDLP_COOKIE_FILE_FALLBACK, YTDLP_COOKIE_FILE):
         if path and os.path.exists(path):
             nc = _parse_netscape_cookies(path)
@@ -1478,7 +1490,10 @@ def extract_preview_info(url):
             shortcode = _extract_shortcode(url)
             if shortcode:
                 oembed_url = f'https://www.instagram.com/api/v1/oembed/?url=https://www.instagram.com/p/{shortcode}/&hidecaption=0'
+                ig_cookies = load_all_ig_cookies()
                 headers = {'User-Agent': get_random_user_agent()}
+                if ig_cookies:
+                    headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in ig_cookies.items() if v)
                 oembed_resp = requests.get(oembed_url, headers=headers, timeout=10)
                 if oembed_resp.status_code == 200:
                     oembed_data = oembed_resp.json()

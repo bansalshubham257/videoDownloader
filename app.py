@@ -365,6 +365,7 @@ def detect_url_type(url):
       TikTok   → 'tiktok_video'   | 'tiktok_profile'
       Facebook → 'facebook_video' | 'facebook_profile'
       Pinterest→ 'pinterest_post' | 'pinterest_profile'
+      LinkedIn → 'linkedin_video' | 'linkedin_profile'
       Generic  → 'generic' (for unknown/unsupported sites that yt-dlp can handle)
       Other    → 'unknown'
     """
@@ -422,6 +423,14 @@ def detect_url_type(url):
         if re.search(r'instagram\.com/([A-Za-z0-9_.]+)$', clean) and \
                 not any(x in clean for x in ['/p/', '/reel/', '/tv/', '/stories/', '/explore/', '/accounts/']):
             return 'profile'
+
+    # ── LinkedIn ─────────────────────────────────────────────────────────
+    if 'linkedin.com' in url:
+        if '/posts/' in url or '/feed/' in url or '/video/' in url:
+            return 'linkedin_video'
+        if '/in/' in url:
+            return 'linkedin_profile'
+        return 'linkedin_video'
 
     # ── Generic/Unknown website (try with yt-dlp) ────────────────────────
     # If it's a valid URL from an unknown domain, mark it as 'generic'
@@ -733,6 +742,95 @@ def terms():
     return render_template('terms.html')
 
 
+@app.route('/linkedin-video-downloader')
+@app.route('/linkedin-downloader')
+def linkedin_downloader():
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">LinkedIn Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos is the fastest <strong>free online LinkedIn video downloader</strong> and <strong>LinkedIn post media saver</strong>.
+        Simply paste any LinkedIn post URL that contains a video or images and click <em>Search</em> — your media will be ready to save in seconds.
+        No login, no app install, no watermarks. Works on mobile, tablet and desktop.
+      </p>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download LinkedIn Videos — 3 Easy Steps</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Open LinkedIn and find the post with the video or image you want to save.</li>
+        <li>Copy the post URL from the address bar (e.g. <code>https://www.linkedin.com/posts/username_title-activity_id</code>).</li>
+        <li>Paste it into the search box above and click <strong>Search</strong>, then click <strong>Download</strong>.</li>
+      </ol>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Features of Our Free LinkedIn Video Downloader</h3>
+      <ul style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>✅ Download LinkedIn videos in MP4 — HD quality</li>
+        <li>✅ Download images from LinkedIn posts</li>
+        <li>✅ Save LinkedIn post media for offline viewing</li>
+        <li>✅ 100% free — no registration, no credit card</li>
+        <li>✅ Works on iPhone, Android, Windows & Mac</li>
+        <li>✅ No watermark added to your downloaded video</li>
+        <li>✅ Download public LinkedIn post media instantly</li>
+      </ul>
+
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this LinkedIn video downloader really free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — QuickSaveVideos is 100% free. There are no hidden charges, no subscription and no sign-up required.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download LinkedIn videos on my iPhone or Android?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Absolutely. Our online LinkedIn video downloader works in any mobile browser — no app download needed. Just open quicksavevideos.com, paste the LinkedIn link, and save the video to your camera roll.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">What video quality can I download from LinkedIn?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">We automatically fetch the highest quality available for the post — usually 720p or 1080p MP4.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download images from LinkedIn posts?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. LinkedIn posts with images can be downloaded as high-quality JPG or PNG files.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">How do I get the LinkedIn post URL?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Open the LinkedIn app or website, go to the post, and copy the URL from the address bar. Or tap the three dots on the post and select Copy link to post.</p>
+        </details>
+      </div>
+
+      <p style="font-size:13px;color:#94a3b8;line-height:1.7">
+        QuickSaveVideos is not affiliated with LinkedIn or Microsoft. Downloading media is permitted for personal, offline use only.
+        Please respect the original creator's rights and do not re-upload content without permission.
+      </p>
+    </div>
+    """
+    linkedin_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {"@type": "Question", "name": "Is this LinkedIn video downloader really free?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes — QuickSaveVideos is 100% free. No hidden charges, no subscription and no sign-up required."}},
+            {"@type": "Question", "name": "Can I download LinkedIn videos on my iPhone or Android?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Absolutely. Our online LinkedIn video downloader works in any mobile browser — no app download needed."}},
+            {"@type": "Question", "name": "What video quality can I download from LinkedIn?",
+             "acceptedAnswer": {"@type": "Answer", "text": "We automatically fetch the highest quality available — usually 720p or 1080p MP4."}},
+            {"@type": "Question", "name": "Can I download images from LinkedIn posts?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Yes. LinkedIn posts with images can be downloaded as high-quality JPG or PNG files."}},
+            {"@type": "Question", "name": "How do I get the LinkedIn post URL?",
+             "acceptedAnswer": {"@type": "Answer", "text": "Open the LinkedIn app or website, go to the post, and copy the URL from the address bar or share menu."}}
+        ]
+    })
+    return render_template(
+        'index.html',
+        page_title='Free LinkedIn Video Downloader Online — Save Post Videos & Images | QuickSaveVideos',
+        page_description='Download LinkedIn videos and images for free online. Paste any LinkedIn post URL and save MP4 videos and photos in HD quality. No login, no watermark, no app needed. Works on mobile.',
+        page_keywords='linkedin video downloader, linkedin post downloader, linkedin video saver, free linkedin video downloader, download linkedin video, linkedin media downloader, save linkedin post video, linkedin mp4 download, linkedin image downloader',
+        page_canonical='https://quicksavevideos.com/linkedin-video-downloader',
+        page_h1='🔗 Free LinkedIn Video Downloader — Save Post Videos & Images',
+        page_subtitle='Paste any LinkedIn post URL to download the video or images in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=linkedin_jsonld,
+    )
+
+
 # ── SEO Guide Pages ──
 
 @app.route('/how-to-download-instagram-videos')
@@ -758,6 +856,10 @@ def guide_facebook():
 @app.route('/how-to-download-pinterest-videos')
 def guide_pinterest():
     return render_template('guide-pinterest.html')
+
+@app.route('/how-to-download-linkedin-videos')
+def guide_linkedin():
+    return render_template('guide-linkedin.html')
 
 
 @app.route('/robots.txt')
@@ -842,6 +944,16 @@ def sitemap():
   </url>
   <url>
     <loc>https://quicksavevideos.com/how-to-download-pinterest-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/linkedin-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-linkedin-videos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -1402,8 +1514,24 @@ def extract_preview_info(url):
             description = _og('description')
             is_video    = bool(re.search(r'og:video', html))
 
+            # ── LinkedIn: enrich description from JSON-LD (og:description is truncated) ──
+            if 'linkedin.com' in url:
+                ld_match = re.search(
+                    r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
+                    html, re.DOTALL
+                )
+                if ld_match:
+                    try:
+                        ld_data = json.loads(ld_match.group(1))
+                        body = ld_data.get('articleBody') or ld_data.get('description', '')
+                        if body and len(body) > len(description):
+                            description = body
+                            logger.info(f"✅ LinkedIn JSON-LD description: {len(body)} chars")
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+
             if thumbnail or description:
-                preview_data['thumbnail']   = thumbnail
+                preview_data['thumbnail']   = thumbnail.replace('&amp;', '&')
                 preview_data['title']       = title
                 preview_data['description'] = description
                 preview_data['is_video']    = is_video
@@ -2862,6 +2990,15 @@ def download():
         if 'instagram.com' in url:
             return try_download_methods(url, 'best', content_type)
 
+        # ── LinkedIn ──
+        if 'linkedin.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_linkedin(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'LinkedIn download failed. The post may require login or contain no downloadable media.'}), 400
+
         # ── Generic fallback — try yt-dlp for any other site ──
         else:
             if not YTDLP_AVAILABLE:
@@ -2899,6 +3036,14 @@ TWITTER_FORMATS = {
 
 # TikTok typically maxes out at 720p
 TIKTOK_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+LINKEDIN_FORMATS = {
     'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
     '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
     '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
@@ -3301,6 +3446,140 @@ def download_tiktok(url, quality='best'):
             return jsonify({'error': '🔒 This TikTok video is private or requires login.'}), 400
         logger.warning(f"⚠️ TikTok download failed: {e}")
         return None
+
+
+def _extract_linkedin_page_media(url):
+    """Scrape a LinkedIn post page for media URLs (video + image)."""
+    try:
+        headers = {
+            'User-Agent': (
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                'AppleWebKit/537.36 (KHTML, like Gecko) '
+                'Chrome/124.0.0.0 Safari/537.36'
+            ),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        resp = requests.get(url, headers=headers, timeout=20)
+        if resp.status_code != 200:
+            return None, None
+
+        html = resp.text
+        import re
+
+        og_image = None
+        og_video = None
+
+        # ── Method 1: og:image meta tag ──
+        m = re.search(r'og:image[^>]*content=["\']([^"\']+)["\']', html)
+        if m:
+            og_image = m.group(1).replace('&amp;', '&')
+
+        # ── Method 2: og:video meta tag ──
+        m = re.search(r'og:video[^>]*content=["\']([^"\']+)["\']', html)
+        if m:
+            og_video = m.group(1).replace('&amp;', '&')
+
+        # ── Method 3: LinkedIn video player data-sources ──
+        if not og_video:
+            m = re.search(r'data-sources=["\']([^"\']+)["\']', html)
+            if m:
+                raw = m.group(1).replace('&amp;', '&')
+                try:
+                    sources = json.loads(raw)
+                    if isinstance(sources, list) and len(sources) > 0:
+                        src = sources[0].get('src', '')
+                        if src:
+                            og_video = src
+                except (json.JSONDecodeError, AttributeError):
+                    if raw.startswith('http'):
+                        og_video = raw
+
+        # ── Method 4: videoUrl / playableUrl in page JSON blobs ──
+        if not og_video:
+            for pattern in [r'"videoUrl"\s*:\s*"([^"]+)"',
+                            r'"playableUrl"\s*:\s*"([^"]+)"',
+                            r'"url"\s*:\s*"([^"]+\.mp4)"',
+                            r'"src"\s*:\s*"([^"]+\.mp4[^"]*)"']:
+                m = re.search(pattern, html)
+                if m:
+                    candidate = m.group(1).replace('\\/', '/').replace('&amp;', '&')
+                    if candidate.startswith('http') and '.mp4' in candidate:
+                        og_video = candidate
+                        break
+
+        # ── Method 5: Direct <video> tag <source> ──
+        if not og_video:
+            m = re.search(r'<source[^>]+src=["\']([^"\']+\.mp4[^"\']*)["\']', html)
+            if m:
+                og_video = m.group(1)
+
+        if og_video:
+            return og_video, 'mp4'
+
+        if og_image:
+            return og_image, 'jpg'
+
+        return None, None
+    except Exception as e:
+        logger.warning(f"⚠️ LinkedIn page scrape failed: {e}")
+        return None, None
+
+
+def download_linkedin(url, quality='best'):
+    """Download a LinkedIn video or image.
+
+    Strategy:
+      1. Try yt-dlp (handles native video posts).
+      2. Fallback: scrape page HTML for og:image / og:video and download directly.
+    """
+    is_audio = (quality == 'audio')
+    logger.info(f"🔗 LinkedIn download: {url} | quality={quality}")
+
+    # ── Method 1: yt-dlp (best for video posts) ──
+    if YTDLP_AVAILABLE:
+        try:
+            fmt = LINKEDIN_FORMATS.get(quality, LINKEDIN_FORMATS['best'])
+            if is_audio:
+                candidates = [fmt, 'bestaudio/best', 'best']
+            elif FFMPEG_AVAILABLE:
+                candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            else:
+                candidates = [fmt, 'best[ext=mp4]/best', 'best']
+
+            filename, file_size = _download_with_format_fallback(
+                url,
+                os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+                candidates,
+                timeout=60,
+                merge=(not is_audio),
+                scan_exts=('mp4', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'webp', 'mp3', 'm4a')
+            )
+            if filename:
+                logger.info(f"✅ LinkedIn yt-dlp: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
+        except Exception as e:
+            err_text = str(e).lower()
+            if 'login' in err_text or 'private' in err_text or 'auth' in err_text:
+                return jsonify({'error': '🔒 This LinkedIn post requires login. Try a public post URL.'}), 400
+            logger.info(f"⚠️ yt-dlp failed for LinkedIn, trying page scrape fallback: {e}")
+
+    # ── Method 2: Scrape page for og:image / og:video ──
+    try:
+        media_url, ext = _extract_linkedin_page_media(url)
+        if media_url:
+            logger.info(f"📥 LinkedIn page scrape found media: {media_url[:80]}... ext={ext}")
+            result = _download_raw_url(media_url, ext)
+            if result:
+                return result
+    except Exception as e:
+        logger.warning(f"⚠️ LinkedIn page scrape download failed: {e}")
+
+    return jsonify({'error': '⚠️ Could not download from this LinkedIn post. The post may contain no media, require login, or be private.'}), 400
 
 
 def download_generic(url, quality='best'):
@@ -4469,6 +4748,8 @@ def _download_raw_url(media_url, ext):
         # Use the right Referer so CDN auth checks pass
         if 'twimg.com' in media_url or 'twitter.com' in media_url or 'x.com' in media_url:
             referer = 'https://twitter.com/'
+        elif 'licdn.com' in media_url or 'linkedin.com' in media_url:
+            referer = 'https://www.linkedin.com/'
         else:
             referer = 'https://www.instagram.com/'
         headers = {
@@ -4522,22 +4803,25 @@ def proxy_thumbnail():
                'ytimg.com', 'ggpht.com', 'googleusercontent.com',
                'twimg.com', 'pbs.twimg.com',
                'pinimg.com', 'i.pinimg.com',
-               'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktok.com')
+               'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktok.com',
+               'licdn.com', 'linkedin.com')
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
-        is_twitter   = 'twimg.com' in img_url
-        is_pinterest = 'pinimg.com' in img_url
-        is_tiktok    = 'tiktok' in img_url
+        is_twitter    = 'twimg.com' in img_url
+        is_pinterest  = 'pinimg.com' in img_url
+        is_tiktok     = 'tiktok' in img_url
+        is_linkedin   = 'licdn.com' in img_url or 'linkedin.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
             'Referer':    ('https://www.tiktok.com/' if is_tiktok
                            else 'https://www.pinterest.com/' if is_pinterest
             else 'https://twitter.com/' if is_twitter
+            else 'https://www.linkedin.com/' if is_linkedin
             else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        if not is_twitter and not is_pinterest and not is_tiktok:
+        if not is_twitter and not is_pinterest and not is_tiktok and not is_linkedin:
             cookies = load_cookies()
             if cookies:
                 headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)

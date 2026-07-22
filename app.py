@@ -4553,11 +4553,23 @@ def _fetch_quora_media(url):
     try:
         from curl_cffi import requests as cffi_req
         logger.info(f"   Fetching Quora page via curl_cffi...")
-        resp = cffi_req.get(url, impersonate='chrome', timeout=20)
-        if resp.status_code != 200:
-            logger.warning(f"   Quora page returned {resp.status_code}")
+        # Try multiple impersonation profiles
+        profiles = ['chrome142', 'chrome136', 'chrome131', 'safari18_0', 'firefox144']
+        html = None
+        for profile in profiles:
+            try:
+                resp = cffi_req.get(url, impersonate=profile, timeout=25)
+                if resp.status_code == 200:
+                    html = resp.text
+                    logger.info(f"   ✅ curl_cffi succeeded with {profile}")
+                    break
+                else:
+                    logger.info(f"   curl_cffi {profile} returned {resp.status_code}")
+            except Exception as e:
+                logger.info(f"   curl_cffi {profile} failed: {e}")
+        if html is None:
+            logger.warning("   All curl_cffi profiles failed")
             return None, None, None, None, None
-        html = resp.text
         import re
 
         # Extract question title from og:title

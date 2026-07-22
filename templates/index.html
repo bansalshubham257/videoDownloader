@@ -557,9 +557,11 @@
         .pill-pi { background: linear-gradient(135deg, rgba(220, 38, 38, 0.14), rgba(236, 72, 153, 0.14)); }
         .pill-fb { background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(14, 165, 233, 0.15)); }
         .pill-li { background: linear-gradient(135deg, rgba(10, 102, 194, 0.15), rgba(0, 119, 181, 0.15)); }
+        .pill-re { background: linear-gradient(135deg, rgba(255, 69, 0, 0.14), rgba(255, 120, 50, 0.14)); }
+        .pill-qu { background: linear-gradient(135deg, rgba(185, 43, 39, 0.14), rgba(200, 60, 55, 0.14)); }
 
         @media (prefers-color-scheme: dark) {
-            .pill-tk, .pill-ig, .pill-yt, .pill-tw, .pill-pi, .pill-fb, .pill-li {
+            .pill-tk, .pill-ig, .pill-yt, .pill-tw, .pill-pi, .pill-fb, .pill-li, .pill-re, .pill-qu {
                 border-color: rgba(148, 163, 184, 0.45);
             }
         }
@@ -2659,8 +2661,8 @@
     <header class="hero-header">
         <!-- Search -->
         <div class="search-wrap">
-            <h1>{{ page_h1 | default('📥 Free Video Downloader — TikTok, Instagram, YouTube, LinkedIn & More') }}</h1>
-            <p class="search-subtitle">{{ page_subtitle | default('Download TikTok videos without watermark, Instagram Reels, YouTube Shorts, Twitter/X videos, Facebook Reels, Pinterest videos, LinkedIn videos and photos — free, fast, HD quality, no login needed.') }}</p>
+            <h1>{{ page_h1 | default('📥 Free Video Downloader — TikTok, Instagram, YouTube, Reddit, Quora & More') }}</h1>
+            <p class="search-subtitle">{{ page_subtitle | default('Download TikTok videos without watermark, Instagram Reels, YouTube Shorts, Twitter/X videos, Facebook Reels, Pinterest videos, LinkedIn videos, Reddit and Quora media — free, fast, HD quality, no login needed.') }}</p>
             <div class="brand-pills">
                 <span class="brand-pill pill-tk">🎵 TikTok</span>
                 <span class="brand-pill pill-ig">📸 Instagram</span>
@@ -2669,11 +2671,13 @@
                 <span class="brand-pill pill-pi">📌 Pinterest</span>
                 <span class="brand-pill pill-fb">📘 Facebook</span>
                 <span class="brand-pill pill-li">🔗 LinkedIn</span>
+                <span class="brand-pill pill-re">💬 Reddit</span>
+                <span class="brand-pill pill-qu">❓ Quora</span>
             </div>
             <div class="search-row">
                 <div class="input-wrap">
                     <label class="sr-only" for="ig-url">Video URL</label>
-                    <input type="url" id="ig-url" placeholder="Paste any video URL — TikTok, Instagram, YouTube, Twitter/X, Facebook, Pinterest, LinkedIn, Vimeo…" autocomplete="off" aria-label="Video URL input">
+                    <input type="url" id="ig-url" placeholder="Paste any video URL — TikTok, Instagram, YouTube, Twitter/X, Facebook, Pinterest, LinkedIn, Reddit, Quora, Vimeo…" autocomplete="off" aria-label="Video URL input">
                     <!-- Paste button: shown when input is empty -->
                     <button type="button" class="input-action-btn visible" id="paste-btn" title="Paste from clipboard" onclick="pasteFromClipboard()">📋</button>
                     <!-- Clear button: shown when input has text -->

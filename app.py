@@ -2130,12 +2130,20 @@ def extract_preview_info(url):
     if not preview_data and ('quora.com' in url or 'qr.ae' in url) and CURL_CFFI_AVAILABLE:
         try:
             logger.info("🔍 Trying Quora page fetch via curl_cffi for preview...")
-            media_url, _ = _fetch_quora_media(url)
+            media_url, _, title, author, content = _fetch_quora_media(url)
             if media_url:
                 preview_data['thumbnail'] = media_url
                 preview_data['is_video'] = False
                 preview_data['type'] = 'photo'
                 logger.info(f"✅ Quora curl_cffi preview: {media_url[:80]}")
+            if title:
+                preview_data['title'] = title
+            if author:
+                preview_data['author'] = author
+            if content:
+                preview_data['description'] = content
+            elif author:
+                preview_data['description'] = author
         except Exception as e:
             logger.warning(f"⚠️ Quora curl_cffi preview failed: {e}")
 
@@ -4414,14 +4422,14 @@ def _extract_reddit_post_id(url):
     if m:
         return m.group(1)
     # Try reddit.com/s/ short URLs — follow redirect to canonical URL
+    # Check r.url even on non-200 (403 may come after redirect)
     if '/s/' in url:
         try:
             r = requests.get(url, headers={'User-Agent': get_random_user_agent()},
                              timeout=15, allow_redirects=True)
-            if r.status_code == 200:
-                m = re.search(r'/comments/([a-z0-9]+)', r.url)
-                if m:
-                    return m.group(1)
+            m = re.search(r'/comments/([a-z0-9]+)', r.url)
+            if m:
+                return m.group(1)
         except Exception:
             pass
     return None
@@ -4538,22 +4546,43 @@ def download_reddit(url, quality='best'):
 
 
 def _fetch_quora_media(url):
-    """Fetch Quora answer page using curl_cffi to bypass Cloudflare, extract media URLs."""
+    """Fetch Quora answer page using curl_cffi to bypass Cloudflare, extract media + metadata.
+    Returns (media_url, ext, title, author, content)."""
     if not CURL_CFFI_AVAILABLE:
-        return None, None
+        return None, None, None, None, None
     try:
         from curl_cffi import requests as cffi_req
         logger.info(f"   Fetching Quora page via curl_cffi...")
         resp = cffi_req.get(url, impersonate='chrome', timeout=20)
         if resp.status_code != 200:
             logger.warning(f"   Quora page returned {resp.status_code}")
-            return None, None
+            return None, None, None, None, None
         html = resp.text
         import re
+
+        # Extract question title from og:title
+        title = None
+        m = re.search(r'''<meta[^>]*property=['"]og:title['"][^>]*content=['"]([^'"]+)['"]''', html, re.IGNORECASE)
+        if m:
+            title = m.group(1)
+
+        # Extract author from og:url (/answer/{author_name})
+        author = None
+        m = re.search(r'''(?:property=['"]og:url['"]|og:url)[^>]*content=['"]([^'"]*/answer/([^'"?/]+))['"]''', html, re.IGNORECASE)
+        if m:
+            author = m.group(2).replace('-', ' ')
+
+        # Extract content from og:description (strip "Author's answer: " prefix)
+        content = None
+        m = re.search(r'''<meta[^>]*property=['"]og:description['"][^>]*content=['"]([^'"]+)['"]''', html, re.IGNORECASE)
+        if m:
+            content = m.group(1)
+            # Strip "Author's answer: " prefix
+            content = re.sub(r'^[^:]+&#039;s answer:\s*', '', content)
+
         # Look for image URLs in Quora CDN
         images = re.findall(r'(https://qph\.cf2\.quoracdn\.net/main-qimg-[^"\'\\&\s]+)', html)
         if images:
-            # Return the first actual content image (skip thumbnails/profile pics)
             for img in images:
                 clean = img.split('\\')[0].split('&')[0].split('"')[0]
                 if 'main-qimg' in clean:
@@ -4562,11 +4591,11 @@ def _fetch_quora_media(url):
                         ext = 'png'
                     elif '/gif' in clean or '.gif' in clean:
                         ext = 'gif'
-                    return clean, ext
-        return None, None
+                    return clean, ext, title, author, content
+        return None, None, title, author, content
     except Exception as e:
         logger.warning(f"   Quora page fetch failed: {e}")
-        return None, None
+        return None, None, None, None, None
 
 
 def download_quora(url, quality='best'):
@@ -4627,7 +4656,7 @@ def download_quora(url, quality='best'):
 
     # ── Method 2: curl_cffi page fetch (bypasses Cloudflare) ──
     logger.info("   Trying curl_cffi page fetch for Quora media...")
-    media_url, ext = _fetch_quora_media(url)
+    media_url, ext, _, _, _ = _fetch_quora_media(url)
     if media_url:
         logger.info(f"   ✅ Found Quora media: {media_url[:80]}...")
         result = _download_raw_url(media_url, ext or 'jpg')

@@ -286,27 +286,38 @@ def load_all_ig_cookies():
 
 def save_cookies(cookies: dict):
     """Persist cookies dict to JSON file and regenerate the Netscape txt for yt-dlp."""
+    from urllib.parse import unquote
     try:
+        # URL-decode any cookie values (users often paste URL-encoded values from browsers)
+        decoded = {}
+        for k, v in cookies.items():
+            if v and isinstance(v, str):
+                decoded[k] = unquote(v)
+            else:
+                decoded[k] = v
         with open(COOKIES_FILE, 'w') as f:
-            json.dump(cookies, f, indent=2)
-        _write_netscape_cookies(cookies)
-        logger.info(f"✅ Cookies saved ({list(cookies.keys())})")
+            json.dump(decoded, f, indent=2)
+        _write_netscape_cookies(decoded)
+        logger.info(f"✅ Cookies saved ({list(decoded.keys())})")
     except Exception as e:
         logger.error(f"❌ Could not save cookies: {e}")
 
 def _write_netscape_cookies(cookies: dict):
-    """Write Netscape-format cookies file for yt-dlp."""
+    """Write Netscape-format cookies file for yt-dlp (read-only to prevent yt-dlp overwrite)."""
     expiry = int(time.time()) + 365 * 24 * 3600  # 1 year
     lines = ["# Netscape HTTP Cookie File", "# https://curl.se/docs/http-cookies.html", ""]
     for name, value in cookies.items():
         if value:
             lines.append(f".instagram.com\tTRUE\t/\tTRUE\t{expiry}\t{name}\t{value}")
-    with open(NETSCAPE_COOKIES_FILE, 'w') as f:
+    path = NETSCAPE_COOKIES_FILE
+    with open(path, 'w') as f:
         f.write('\n'.join(lines) + '\n')
+    os.chmod(path, 0o444)  # read-only so yt-dlp doesn't overwrite with expired cookies
 
-def get_session_headers(extra: dict = None):
+def get_session_headers(extra: dict = None, cookies=None):
     """Build request headers with Instagram session cookies if available (all sources)."""
-    cookies = load_all_ig_cookies()
+    if cookies is None:
+        cookies = load_all_ig_cookies()
     headers = {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
         'x-ig-app-id': '936619743392459',
@@ -328,6 +339,41 @@ def get_session_headers(extra: dict = None):
 def cookies_are_set():
     """Return True if a valid Instagram sessionid is available from any cookie source."""
     return bool(load_all_ig_cookies().get('sessionid'))
+
+
+def validate_ig_cookies(cookies=None):
+    """
+    Verify that the given (or currently saved) Instagram session cookies are still valid
+    by making a lightweight API call. Returns (valid: bool, detail: str).
+    """
+    if cookies is None:
+        cookies = load_all_ig_cookies()
+    sessionid = cookies.get('sessionid', '')
+    if not sessionid:
+        return False, 'No sessionid cookie'
+
+    # Sanity: sessionid should contain colons (user_id:hash:num:token)
+    if ':' not in sessionid:
+        return False, 'sessionid format is invalid (missing colons)'
+
+    try:
+        resp = requests.get(
+            'https://www.instagram.com/api/v1/accounts/current_user/',
+            headers=get_session_headers(cookies),
+            timeout=10,
+            allow_redirects=False,
+        )
+        # 200 = valid; 302 = redirect to login (session expired); 4xx = auth error
+        if resp.status_code == 200:
+            return True, 'valid'
+        elif resp.status_code in (302, 400, 401, 403):
+            return False, 'session expired or invalid'
+        else:
+            # 429 = rate-limited, 5xx = server error — cookies might be OK
+            return True, f'api returned {resp.status_code}'
+    except Exception as e:
+        logger.warning(f"⚠️ Cookie validation request failed: {e}")
+        return True, 'validation request failed (network issue)'
 
 
 def normalize_twitter_url(url):
@@ -987,10 +1033,12 @@ def detect():
 @app.route('/api/set-cookie', methods=['POST'])
 def set_cookie():
     """Save Instagram session cookies provided by the user."""
+    from urllib.parse import unquote
+
     data = request.json or {}
-    sessionid = data.get('sessionid', '').strip()
-    csrftoken  = data.get('csrftoken', '').strip()
-    ds_user_id = data.get('ds_user_id', '').strip()
+    sessionid = unquote(data.get('sessionid', '').strip())
+    csrftoken  = unquote(data.get('csrftoken', '').strip())
+    ds_user_id = unquote(data.get('ds_user_id', '').strip())
 
     if not sessionid:
         return jsonify({'error': 'sessionid is required'}), 400
@@ -1002,6 +1050,14 @@ def set_cookie():
         cookies['ds_user_id'] = ds_user_id
 
     save_cookies(cookies)
+
+    valid, _ = validate_ig_cookies(cookies)
+    if not valid:
+        return jsonify({
+            'success': True,
+            'warning': 'Cookies saved but appear to be invalid or expired. Instagram download may fail until you update with fresh cookies.',
+        })
+
     return jsonify({'success': True, 'message': 'Cookies saved successfully'})
 
 
@@ -1010,8 +1066,14 @@ def set_cookie():
 def cookie_status():
     cookies = load_cookies()
     has_session = bool(cookies.get('sessionid'))
+    valid = False
+    status_detail = ''
+    if has_session:
+        valid, status_detail = validate_ig_cookies(cookies)
     return jsonify({
         'has_cookies': has_session,
+        'valid': valid,
+        'status_detail': status_detail,
         'keys': list(cookies.keys()) if has_session else [],
     })
 
@@ -1813,9 +1875,9 @@ def extract_preview_info(url):
 
 def _fetch_carousel_from_page_source(url):
     """
-    Fetch the Instagram post page HTML and extract all carousel/album media items
-    from the embedded JSON blobs (data-sjs script tags).
-    Works for PUBLIC posts without any authentication/session cookie.
+    Fetch media items from an Instagram post/reel using multiple methods:
+      1. Instagram Private API (media/{pk}/info/) — with session cookies
+      2. Instagram WWW page scraping (legacy) — no auth needed
     Returns list of {index, url, thumbnail, is_video, ext, caption} dicts.
     """
     import re
@@ -1827,14 +1889,67 @@ def _fetch_carousel_from_page_source(url):
 
     items = []
     caption = ''
+    ig_cookies = load_all_ig_cookies()
+
+    # ── Method 1: Instagram Private API (preferred, requires session) ──
+    if ig_cookies.get('sessionid'):
+        try:
+            media_pk = shortcode_to_media_pk(shortcode)
+            api_resp = requests.get(
+                f'https://www.instagram.com/api/v1/media/{media_pk}/info/',
+                headers=get_session_headers(), timeout=20,
+            )
+            if api_resp.status_code == 200:
+                root = (api_resp.json().get('items') or [{}])[0]
+                media_type = root.get('media_type')
+                # Caption
+                cap = root.get('caption')
+                if isinstance(cap, dict):
+                    caption = cap.get('text', '')
+                elif isinstance(cap, str):
+                    caption = cap
+                if media_type == 8:  # Album
+                    for idx, child in enumerate(root.get('carousel_media', [])):
+                        ct = child.get('media_type')
+                        tc = child.get('image_versions2', {}).get('candidates', [])
+                        thumb = tc[0]['url'] if tc else ''
+                        if ct == 2:
+                            for v in child.get('video_versions', []):
+                                if v.get('url'):
+                                    items.append({'index': idx, 'url': v['url'],
+                                                  'thumbnail': thumb, 'is_video': True, 'ext': 'mp4', 'caption': caption})
+                                    break
+                        elif thumb:
+                            items.append({'index': idx, 'url': thumb,
+                                          'thumbnail': thumb, 'is_video': False, 'ext': 'jpg', 'caption': caption})
+                elif media_type == 2:  # Single video
+                    for v in root.get('video_versions', []):
+                        if v.get('url'):
+                            tc2 = root.get('image_versions2', {}).get('candidates', [])
+                            items.append({'index': 0, 'url': v['url'],
+                                          'thumbnail': tc2[0]['url'] if tc2 else '',
+                                          'is_video': True, 'ext': 'mp4', 'caption': caption})
+                            break
+                elif media_type == 1:  # Single photo
+                    tc3 = root.get('image_versions2', {}).get('candidates', [])
+                    if tc3:
+                        items.append({'index': 0, 'url': tc3[0]['url'],
+                                      'thumbnail': tc3[0]['url'], 'is_video': False, 'ext': 'jpg', 'caption': caption})
+                if items:
+                    logger.info(f"✅ Carousel: {len(items)} item(s) via Private API")
+                    return items
+        except Exception as api_e:
+            logger.warning(f"⚠️ Carousel Private API failed: {api_e}")
+
+    # ── Method 2: WWW page scraping (legacy) ──────────────────────────
     try:
+        # Try /reel/ URL first for reels, then /p/
         post_url = f'https://www.instagram.com/p/{shortcode}/'
+        is_reel = url and '/reel/' in url
+        if is_reel:
+            post_url = f'https://www.instagram.com/reel/{shortcode}/'
 
-        # Use a desktop Chrome UA — Instagram embeds the full JSON payload for desktop.
-        # Also pass any available session cookies so rate-limited server IPs get the data.
-        ig_cookies = load_all_ig_cookies()
         cookie_str = '; '.join(f"{k}={v}" for k, v in ig_cookies.items() if v) if ig_cookies else ''
-
         headers = {
             'User-Agent': (
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -1856,7 +1971,6 @@ def _fetch_carousel_from_page_source(url):
 
         html = resp.text
 
-        # Extract all <script type="application/json"[^>]*> blobs (data-sjs SSR data)
         json_scripts = re.findall(
             r'<script type="application/json"[^>]*>(.+?)</script>',
             html, re.DOTALL
@@ -1867,10 +1981,8 @@ def _fetch_carousel_from_page_source(url):
             if depth > 25:
                 return None
             if isinstance(obj, dict):
-                # Priority: prefer objects with carousel_media (full album)
                 if 'carousel_media' in obj and isinstance(obj['carousel_media'], list):
                     return obj
-                # Also match single-item posts
                 if 'image_versions2' in obj and 'media_type' in obj:
                     return obj
                 for v in obj.values():
@@ -1886,7 +1998,6 @@ def _fetch_carousel_from_page_source(url):
 
         media_root = None
         for blob_str in json_scripts:
-            # Quick string-level pre-filter to avoid parsing large irrelevant blobs
             if 'carousel_media' not in blob_str and 'image_versions2' not in blob_str:
                 continue
             try:
@@ -1900,51 +2011,6 @@ def _fetch_carousel_from_page_source(url):
 
         if not media_root:
             logger.warning("⚠️ Could not find media root in page source JSON blobs")
-            # ── Fallback: Instagram Internal API with available cookies ──
-            # (fires even when cookies come only from the env / yt-dlp bootstrap)
-            if ig_cookies.get('sessionid'):
-                try:
-                    import json as _json2
-                    media_pk = shortcode_to_media_pk(shortcode)
-                    api_resp = requests.get(
-                        f'https://www.instagram.com/api/v1/media/{media_pk}/info/',
-                        headers=get_session_headers(), timeout=20,
-                    )
-                    if api_resp.status_code == 200:
-                        root = (api_resp.json().get('items') or [{}])[0]
-                        media_type = root.get('media_type')
-                        if media_type == 8:  # Album
-                            for idx, child in enumerate(root.get('carousel_media', [])):
-                                ct = child.get('media_type')
-                                tc = child.get('image_versions2', {}).get('candidates', [])
-                                thumb = tc[0]['url'] if tc else ''
-                                if ct == 2:
-                                    for v in child.get('video_versions', []):
-                                        if v.get('url'):
-                                            items.append({'index': idx, 'url': v['url'],
-                                                          'thumbnail': thumb, 'is_video': True, 'ext': 'mp4'})
-                                            break
-                                elif thumb:
-                                    items.append({'index': idx, 'url': thumb,
-                                                  'thumbnail': thumb, 'is_video': False, 'ext': 'jpg'})
-                        elif media_type == 2:
-                            for v in root.get('video_versions', []):
-                                if v.get('url'):
-                                    tc2 = root.get('image_versions2', {}).get('candidates', [])
-                                    items.append({'index': 0, 'url': v['url'],
-                                                  'thumbnail': tc2[0]['url'] if tc2 else '',
-                                                  'is_video': True, 'ext': 'mp4'})
-                                    break
-                        elif media_type == 1:
-                            tc3 = root.get('image_versions2', {}).get('candidates', [])
-                            if tc3:
-                                items.append({'index': 0, 'url': tc3[0]['url'],
-                                              'thumbnail': tc3[0]['url'], 'is_video': False, 'ext': 'jpg'})
-                        if items:
-                            logger.info(f"✅ Carousel: {len(items)} item(s) via API fallback (env cookies)")
-                            return items
-                except Exception as _api_e:
-                    logger.warning(f"⚠️ Carousel API fallback failed: {_api_e}")
             return []
 
         # ── Extract caption from media_root ──────────────────────────────
@@ -4251,17 +4317,47 @@ def _fetch_image_from_embed(shortcode):
 
 def _extract_reel_video_from_embed(shortcode):
     """
-    Try to extract a reel/video CDN URL from Instagram's public embed page.
-    Works without authentication for public posts.
+    Extract a reel/video CDN URL from Instagram.
+    Tries in order:
+      1. Instagram Private API (media/{pk}/info/) with session cookies
+      2. Instagram's public embed page (legacy fallback)
     Returns a direct MP4 URL string, or None.
     """
     import re as _re
     import json as _json
 
+    media_pk = shortcode_to_media_pk(shortcode) if shortcode else None
+
+    # ── Method 1: Instagram Private API (with session cookies) ──────────
+    ig_cookies = load_all_ig_cookies()
+    if media_pk and ig_cookies.get('sessionid'):
+        try:
+            api_url = f'https://www.instagram.com/api/v1/media/{media_pk}/info/'
+            resp = requests.get(
+                api_url, headers=get_session_headers(), timeout=20,
+            )
+            if resp.status_code == 200:
+                root = (resp.json().get('items') or [{}])[0]
+                if root.get('video_versions'):
+                    url = root['video_versions'][0]['url']
+                    if url:
+                        logger.info("✅ Reel video URL found via Private API")
+                        return url
+                # Carousel: check carousel_media
+                for child in root.get('carousel_media', []):
+                    vids = child.get('video_versions', [])
+                    if vids:
+                        url = vids[0]['url']
+                        if url:
+                            logger.info("✅ Reel video URL found via Private API (carousel)")
+                            return url
+        except Exception as e:
+            logger.warning(f"⚠️ _extract_reel_video_from_embed API failed: {e}")
+
+    # ── Method 2: Embed page scraping (legacy, may not work on new Instagram) ──
     for kind in ('reel', 'p'):
         try:
             embed_url = f'https://www.instagram.com/{kind}/{shortcode}/embed/captioned/'
-            ig_cookies = load_all_ig_cookies()
             headers = {
                 'User-Agent': (
                     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -4281,7 +4377,6 @@ def _extract_reel_video_from_embed(shortcode):
 
             html = resp.text
 
-            # ── Direct regex patterns for video URLs ──────────────────
             video_patterns = [
                 r'"video_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
                 r'"playback_url"\s*:\s*"(https://[^"]+\.mp4[^"]*)"',
@@ -4299,7 +4394,6 @@ def _extract_reel_video_from_embed(shortcode):
                         logger.info(f"✅ Embed reel video URL found via pattern")
                         return video_url
 
-            # ── Try JSON blobs (data-sjs script tags) ─────────────────
             blobs = _re.findall(r'<script[^>]*type="application/json"[^>]*>(.+?)</script>', html, _re.DOTALL)
             for blob_str in blobs:
                 if 'video_url' not in blob_str and 'playback_url' not in blob_str:
@@ -4467,12 +4561,21 @@ def try_download_methods(url, quality='best', content_type='both'):
             logger.warning(f"⚠️ try_download_methods embed extractor failed: {e}")
 
     logger.error(f"❌ try_download_methods: all methods failed for {url}")
-    needs_cookie = not cookies_are_set()
-    if needs_cookie:
+    has_cookies = cookies_are_set()
+    if not has_cookies:
         return jsonify({
             'error': (
                 'Could not download. Instagram requires login for this post. '
                 'Add your session cookie in ⚙️ Settings and try again.'
+            )
+        }), 400
+    # Cookies exist but all methods failed — check if they're stale
+    valid, detail = validate_ig_cookies()
+    if not valid:
+        return jsonify({
+            'error': (
+                f'Your Instagram session cookie has expired or is invalid ({detail}). '
+                'Update it in ⚙️ Settings with fresh cookies from your browser.'
             )
         }), 400
     return jsonify({
@@ -4607,6 +4710,15 @@ def download_with_instagrapi(url, content_type='both'):
             raise Exception("Could not extract shortcode from URL")
 
         client = Client()
+
+        # Log in with session ID if available (required for Instagram's new API restrictions)
+        ig_cookies = load_all_ig_cookies()
+        sessionid = ig_cookies.get('sessionid', '')
+        if sessionid:
+            try:
+                client.login_by_sessionid(sessionid)
+            except Exception:
+                pass  # Continue even if login fails — might still work for public content
 
         # Convert shortcode → numeric media PK (fixes 'invalid literal for int()' error)
         try:

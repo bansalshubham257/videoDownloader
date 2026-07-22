@@ -2019,6 +2019,10 @@ def extract_preview_info(url):
     """Extract preview information from Instagram URL using multiple methods"""
     import re
 
+    # Normalize Bilibili URLs: yt-dlp BiliBiliIE only matches www.bilibili.com, not m.bilibili.com
+    if 'bilibili.com' in url:
+        url = url.replace('m.bilibili.com', 'www.bilibili.com').split('?')[0].split('#')[0]
+
     preview_data = {}
 
     # ── Method 1: yt-dlp (most reliable, gets real caption + thumbnail) ──
@@ -3849,6 +3853,8 @@ def _is_format_unavailable_error(err_text):
             or 'format is not available' in err
             or 'no video formats found' in err
             or 'requested format not available' in err
+            or 'ffmpeg is not installed' in err
+            or 'ffmpeg not found' in err
     )
 
 
@@ -4378,18 +4384,27 @@ def download_generic(url, quality='best'):
     yt-dlp supports 1000+ sites — Vimeo, Twitch, Reddit, Dailymotion, etc.
     """
     try:
-        # Use best MP4 format; fall back to best available
-        fmt = {
-            'best':  'bestvideo[ext=mp4]+bestaudio/best',
-            '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
-            '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
-            '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
-            '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
-            'audio': 'bestaudio',
-        }.get(quality, 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best')
-
         is_audio = (quality == 'audio')
         logger.info(f"🌐 Generic download: {url} | quality={quality}")
+
+        # Use combined formats when ffmpeg is unavailable (avoid + merge)
+        if FFMPEG_AVAILABLE or is_audio:
+            fmt = {
+                'best':  'bestvideo[ext=mp4]+bestaudio/best',
+                '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio/best[height<=1080]',
+                '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+                '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+                '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+                'audio': 'bestaudio',
+            }.get(quality, 'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best')
+        else:
+            fmt = {
+                'best':  'best[ext=mp4]/best',
+                '1080p': 'bestvideo[height<=1080][ext=mp4]/best[ext=mp4]',
+                '720p':  'bestvideo[height<=720][ext=mp4]/best[ext=mp4]',
+                '480p':  'bestvideo[height<=480][ext=mp4]/best[ext=mp4]',
+                '360p':  'bestvideo[height<=360][ext=mp4]/best[ext=mp4]',
+            }.get(quality, 'best[ext=mp4]/best')
 
         if is_audio:
             candidates = [fmt, 'bestaudio/best', 'best']

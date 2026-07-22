@@ -4706,6 +4706,7 @@ def _fetch_rumble_media(url):
         r'window\.videoData\s*=\s*({.*?});',
         r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
         r'<script[^>]*>(.*?"mp4"\s*:.*?)</script>',
+        r'<script[^>]*>\s*({[^<]*"mp4"[^<]*})\s*</script>',
     ]
     config = None
     for pat in patterns:
@@ -4713,7 +4714,8 @@ def _fetch_rumble_media(url):
         if m:
             try:
                 config = json.loads(m.group(1))
-                break
+                if config and ('mp4' in config or 'title' in config):
+                    break
             except json.JSONDecodeError:
                 continue
 
@@ -4740,21 +4742,30 @@ def _fetch_rumble_media(url):
 
     # Method 2: Fallback — scrape og:meta tags for thumbnail/title
     if not title:
-        m = re.search(r'<meta\s+property="og:title"\s+content="([^"]*)"', html)
+        m = re.search(r'''<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']''', html, re.IGNORECASE)
+        if not m:
+            m = re.search(r'''<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:title["']''', html, re.IGNORECASE)
         if m:
             title = m.group(1)
     if not thumbnail:
-        m = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', html)
+        m = re.search(r'''<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']''', html, re.IGNORECASE)
+        if not m:
+            m = re.search(r'''<meta\s+content=["']([^"']+)["']\s+(?:property|name)=["']og:image["']''', html, re.IGNORECASE)
         if m:
             thumbnail = m.group(1)
 
     # Method 3: Try to find video URLs from <video> tag or direct mp4 links
     if not video_urls:
-        # Look for <source> tags or data-mp4 attributes
         for m in re.finditer(r'(?:data-mp4|data-url|src)\s*=\s*"([^"]*\.mp4[^"]*)"', html):
             url_val = m.group(1)
-            if url_val.startswith('http'):
-                video_urls['source'] = url_val
+            if url_val.startswith('http') and url_val not in video_urls.values():
+                video_urls[f'source_{len(video_urls)}'] = url_val
+        # Method 3b: Look for Rumble CDN pattern (.gaa.mp4 URLs from generic extractor)
+        if not video_urls:
+            for m in re.finditer(r'(https?://[^"\']+\.gaa\.mp4[^"\']*)', html):
+                url_val = m.group(1).split('"')[0].split("'")[0].split('&')[0]
+                if url_val not in video_urls.values():
+                    video_urls['source'] = url_val
 
     logger.info(f"📡 Rumble page parsed: {len(video_urls)} qualities, title={title[:50] if title else None}")
     return video_urls, title, thumbnail, duration

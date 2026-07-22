@@ -5762,7 +5762,7 @@ def _download_raw_url(media_url, ext):
             referer = 'https://twitter.com/'
         elif 'licdn.com' in media_url or 'linkedin.com' in media_url:
             referer = 'https://www.linkedin.com/'
-        elif 'rumble.com' in media_url:
+        elif 'rumble.com' in media_url or '1a-1791.com' in media_url:
             referer = 'https://rumble.com/'
         else:
             referer = 'https://www.instagram.com/'
@@ -5821,7 +5821,7 @@ def proxy_thumbnail():
                 'licdn.com', 'linkedin.com',
                 'reddit.com', 'redd.it', 'preview.redd.it', 'i.redd.it',
                 'quora.com', 'qph.cf2.quoracdn.net', 'quoracdn.net',
-                'rumble.com')
+                'rumble.com', '1a-1791.com')
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
@@ -5831,7 +5831,7 @@ def proxy_thumbnail():
         is_linkedin   = 'licdn.com' in img_url or 'linkedin.com' in img_url
         is_reddit     = 'reddit.com' in img_url or 'redd.it' in img_url
         is_quora      = 'quoracdn.net' in img_url or 'quora.com' in img_url
-        is_rumble     = 'rumble.com' in img_url
+        is_rumble     = 'rumble.com' in img_url or '1a-1791.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
             'Referer':    ('https://www.tiktok.com/' if is_tiktok

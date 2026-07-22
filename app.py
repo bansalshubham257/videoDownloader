@@ -1050,6 +1050,36 @@ def guide_linkedin():
 
 @app.route('/how-to-download-reddit-videos')
 def guide_reddit():
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">How to Download Reddit Videos — Step-by-Step Guide</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        Downloading videos, GIFs, and images from Reddit is quick and easy with QuickSaveVideos.
+        Follow these simple steps to save any Reddit post media directly to your device.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Step 1: Find the Reddit Post</h3>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:16px">Open Reddit and find the post with the video, GIF, or image you want to download. This works for any subreddit.</p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Step 2: Copy the Post URL</h3>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:16px">Tap the Share button on the post and select <em>Copy Link</em>, or copy the URL from your browser's address bar.</p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Step 3: Paste and Download</h3>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">Paste the link into the search box above, click <strong>Search</strong>, then click <strong>Download</strong>. The media will save directly to your device.</p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Reddit videos on my phone?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes, it works on iPhone, Android, and any device with a modern web browser.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Does it work for Reddit GIFs?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes, Reddit GIFs and vReddit videos are supported and download as MP4 files.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Reddit downloader really free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">100% free — no sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
     return render_template('index.html',
         page_title='How to Download Reddit Videos — Free Reddit Video Downloader Guide | QuickSaveVideos',
         page_description='Learn how to download Reddit videos and images for free. Step-by-step guide to save any Reddit post media to your device. Works for videos, GIFs, and photos.',
@@ -1057,11 +1087,38 @@ def guide_reddit():
         page_canonical='https://quicksavevideos.com/how-to-download-reddit-videos',
         page_h1='🤖 How to Download Reddit Videos — Free Guide',
         page_subtitle='Learn how to save any Reddit post media including videos, GIFs, and images in just a few clicks.',
+        page_seo_content=seo_content,
     )
 
 
 @app.route('/how-to-download-quora-videos')
 def guide_quora():
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">How to Download Quora Videos — Step-by-Step Guide</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        Learn how to download videos and images from Quora answers and posts with QuickSaveVideos.
+        It's free, fast, and works on any device.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Step 1: Find the Quora Post</h3>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:16px">Open Quora and find the answer or post with the video or image you want to save.</p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Step 2: Copy the Post URL</h3>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:16px">Copy the URL from your browser's address bar, or use the Share button to get the link.</p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Step 3: Paste and Download</h3>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">Paste the link into the search box above, click <strong>Search</strong>, then click <strong>Download</strong> to save the media.</p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Quora videos on mobile?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes, it works on iPhone, Android, and any device with a modern browser.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Quora downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">100% free — no sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
     return render_template('index.html',
         page_title='How to Download Quora Videos — Free Quora Video Downloader Guide | QuickSaveVideos',
         page_description='Learn how to download Quora videos and images for free. Step-by-step guide to save media from any Quora answer or post.',
@@ -1069,6 +1126,7 @@ def guide_quora():
         page_canonical='https://quicksavevideos.com/how-to-download-quora-videos',
         page_h1='📋 How to Download Quora Videos — Free Guide',
         page_subtitle='Learn how to save media from any Quora answer or post in just a few clicks.',
+        page_seo_content=seo_content,
     )
 
 

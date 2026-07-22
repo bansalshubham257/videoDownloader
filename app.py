@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context, after_this_request
 import os
+import re
 import base64
 import requests
 from urllib.parse import urlparse, urlunparse
@@ -18,6 +19,27 @@ import threading
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
+
+BILIBILI_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7',
+    'Referer': 'https://www.bilibili.com/',
+    'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"Windows"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+}
+
+VK_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9,ru;q=0.8',
+    'Referer': 'https://vk.com/',
+}
 
 # Always use /tmp — no files are permanently stored on disk.
 # Files are deleted automatically the moment the browser finishes downloading them.
@@ -532,6 +554,12 @@ def detect_url_type(url):
     # ── Odysee ────────────────────────────────────────────────────────────
     if 'odysee.com' in url or 'lbry.tv' in url:
         return 'odysee_video'
+
+    # ── VK / VK Video ─────────────────────────────────────────────────────
+    if 'vk.com' in url or 'vkvideo.ru' in url:
+        if 'video' in url:
+            return 'vk_video'
+        return 'vk_video'
 
     # ── Rumble ───────────────────────────────────────────────────────────
     if 'rumble.com' in url:
@@ -1165,6 +1193,61 @@ def bilibili_downloader_page():
     )
 
 
+# ── VK ────────────────────────────────────────────────────────────────────────────
+@app.route('/vk-video-downloader')
+@app.route('/vk-downloader')
+def vk_downloader_page():
+    vk_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "VK Video Downloader",
+        "url": "https://quicksavevideos.com/vk-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download VK and VK Video clips for free online. Paste any public VK video URL and save in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">VK Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download VK videos</strong> and VK Video clips easily.
+        Paste any public VK video URL and save the video directly to your device in HD quality.
+        Works with <code>vk.com/video...</code>, profile post URLs with <code>?z=video...</code>, and <code>vkvideo.ru</code> links.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download VK Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a VK or VK Video clip you want to save.</li>
+        <li>Copy the video URL from VK or your browser's address bar.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download VK videos in HD?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Available qualities depend on the original VK video. Public videos can be saved in the best available quality.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Does VK downloader require login?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">No login is required for public VK videos. Private or restricted videos may not be downloadable.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free VK Video Downloader Online — Save VK Videos | QuickSaveVideos',
+        page_description='Download VK videos and VK Video clips for free online. Paste any public VK video URL and save MP4 videos in HD quality. No login required.',
+        page_keywords='vk video downloader, vk downloader, download vk videos, vk mp4 download, vkvideo downloader, save vk video',
+        page_canonical='https://quicksavevideos.com/vk-video-downloader',
+        page_h1='🎞️ Free VK Video Downloader — Save VK Videos',
+        page_subtitle='Paste any public VK or VK Video URL to download in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=vk_jsonld,
+    )
+
+
 # ── BitChute ──────────────────────────────────────────────────────────────────────
 @app.route('/bitchute-video-downloader')
 @app.route('/bitchute-downloader')
@@ -1385,6 +1468,11 @@ def guide_bilibili():
     return render_template('guide-bilibili.html')
 
 
+@app.route('/how-to-download-vk-videos')
+def guide_vk():
+    return render_template('guide-vk.html')
+
+
 @app.route('/robots.txt')
 def robots():
     txt = """User-agent: *
@@ -1547,6 +1635,16 @@ def sitemap():
   </url>
   <url>
     <loc>https://quicksavevideos.com/how-to-download-bilibili-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/vk-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-vk-videos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -2035,6 +2133,8 @@ def extract_preview_info(url):
             logger.info("🔍 Extracting preview via yt-dlp...")
             is_twitter = 'twitter.com' in url
             is_youtube = is_youtube_url(url)
+            is_bilibili = 'bilibili.com' in url
+            is_vk = 'vk.com' in url or 'vkvideo.ru' in url
             ydl_opts = {
                 'quiet':          True,
                 'no_warnings':    True,
@@ -2044,7 +2144,7 @@ def extract_preview_info(url):
                 'http_headers':   {'User-Agent': get_random_user_agent()},
             }
             generic_cookie_file = resolve_ytdlp_cookie_file()
-            if generic_cookie_file:
+            if generic_cookie_file and not (is_bilibili or is_vk):
                 ydl_opts['cookiefile'] = generic_cookie_file
             # Twitter requires a different user-agent and no Instagram cookie file
             if is_twitter:
@@ -2053,6 +2153,10 @@ def extract_preview_info(url):
                     'AppleWebKit/537.36 (KHTML, like Gecko) '
                     'Chrome/120.0.0.0 Safari/537.36'
                 )
+            elif is_bilibili:
+                ydl_opts['http_headers'] = BILIBILI_HEADERS.copy()
+            elif is_vk:
+                ydl_opts['http_headers'] = VK_HEADERS.copy()
             elif is_youtube:
                 ydl_opts.update(build_youtube_ydl_overrides(timeout=20))
             elif os.path.exists(NETSCAPE_COOKIES_FILE):
@@ -3770,6 +3874,15 @@ def download():
                 return result
             return jsonify({'error': 'Rumble download failed.'}), 400
 
+        # ── VK / VK Video ──
+        if 'vk.com' in url or 'vkvideo.ru' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_vk(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'VK download failed. The video may be private or require login.'}), 400
+
         # ── Generic fallback — try yt-dlp for any other site ──
         if not YTDLP_AVAILABLE:
             return jsonify({'error': 'yt-dlp not available on this server'}), 500
@@ -3884,18 +3997,18 @@ def _download_with_format_fallback(url, outtmpl, format_candidates, *, timeout=6
                     'User-Agent': get_random_user_agent(),
                 },
             }
+            skip_cookiefile = bool(ydl_overrides and ydl_overrides.get('skip_cookiefile'))
             cookie_file = resolve_ytdlp_cookie_file()
-            if cookie_file:
+            if cookie_file and not skip_cookiefile:
                 ydl_opts['cookiefile'] = cookie_file
 
             # Properly merge ydl_overrides without losing http_headers
             if ydl_overrides:
-                override_headers = ydl_overrides.pop('http_headers', {})
-                ydl_opts.update(ydl_overrides)
+                override_headers = ydl_overrides.get('http_headers', {})
+                clean_overrides = {k: v for k, v in ydl_overrides.items() if k not in ('http_headers', 'skip_cookiefile')}
+                ydl_opts.update(clean_overrides)
                 # Merge headers (override_headers takes precedence)
                 ydl_opts['http_headers'].update(override_headers)
-                # Re-add http_headers to ydl_overrides for potential later use
-                ydl_overrides['http_headers'] = override_headers
 
             if merge and FFMPEG_AVAILABLE:
                 ydl_opts['merge_output_format'] = 'mp4'
@@ -5138,6 +5251,47 @@ def _fetch_rumble_media(url):
     return video_urls, title, thumbnail, duration
 
 
+def download_vk(url, quality='best'):
+    """Download a VK/VK Video URL with clean video URL and desktop headers."""
+    is_audio = (quality == 'audio')
+    logger.info(f"🎞️ VK download: {url} | quality={quality}")
+
+    video_match = re.search(r'video(-?\d+_\d+)', url)
+    clean_url = f"https://vk.com/video{video_match.group(1)}" if video_match else url
+
+    if is_audio:
+        candidates = ['bestaudio/best', 'best']
+    else:
+        fmt_map = {
+            'best':  'best[height<=720]/best[height<=480]/best',
+            '1080p': 'best[height<=1080]/best[height<=720]/best',
+            '720p':  'best[height<=720]/best[height<=480]/best',
+            '480p':  'best[height<=480]/best[height<=360]/best',
+            '360p':  'best[height<=360]/best[height<=240]/best',
+        }
+        candidates = [fmt_map.get(quality, fmt_map['best']), 'best[height<=720]/best']
+
+    filename, file_size = _download_with_format_fallback(
+        clean_url,
+        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+        candidates,
+        timeout=60,
+        merge=False,
+        scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a'),
+        ydl_overrides={'http_headers': VK_HEADERS.copy(), 'skip_cookiefile': True}
+    )
+
+    if filename:
+        logger.info(f"✅ VK: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+        return jsonify({
+            'success':   True,
+            'filename':  os.path.basename(filename),
+            'file_size': f"{file_size/(1024*1024):.2f} MB",
+        })
+
+    return jsonify({'error': 'VK download failed. The video may be private or require login.'}), 400
+
+
 def download_bilibili(url, quality='best'):
     """Download a Bilibili video using yt-dlp with desktop headers and clean BV URL."""
     is_audio = (quality == 'audio')
@@ -5149,11 +5303,6 @@ def download_bilibili(url, quality='best'):
         clean_url = f"https://www.bilibili.com/video/{bv_match.group(1)}"
     else:
         clean_url = url.replace('m.bilibili.com', 'www.bilibili.com').split('?')[0].rstrip('/')
-
-    desktop_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-        'Referer':    'https://www.bilibili.com/',
-    }
 
     if is_audio:
         candidates = ['bestaudio/best', 'best']
@@ -5176,7 +5325,7 @@ def download_bilibili(url, quality='best'):
         timeout=60,
         merge=(not is_audio),
         scan_exts=('mp4', 'mkv', 'flv', 'webm', 'mp3', 'm4a'),
-        ydl_overrides={'http_headers': desktop_headers}
+        ydl_overrides={'http_headers': BILIBILI_HEADERS.copy()}
     )
 
     if filename:
@@ -6217,7 +6366,10 @@ def proxy_thumbnail():
                 'licdn.com', 'linkedin.com',
                 'reddit.com', 'redd.it', 'preview.redd.it', 'i.redd.it',
                 'quora.com', 'qph.cf2.quoracdn.net', 'quoracdn.net',
-                'rumble.com', '1a-1791.com')
+                'rumble.com', '1a-1791.com',
+                'userapi.com', 'vk.com', 'vkvideo.ru',
+                'lbry.com', 'thumbnails.lbry.com', 'odysee.com',
+                'hdslb.com')
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
@@ -6228,6 +6380,9 @@ def proxy_thumbnail():
         is_reddit     = 'reddit.com' in img_url or 'redd.it' in img_url
         is_quora      = 'quoracdn.net' in img_url or 'quora.com' in img_url
         is_rumble     = 'rumble.com' in img_url or '1a-1791.com' in img_url
+        is_bilibili   = 'hdslb.com' in img_url
+        is_vk         = 'userapi.com' in img_url or 'vk.com' in img_url or 'vkvideo.ru' in img_url
+        is_odysee     = 'lbry.com' in img_url or 'odysee.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
             'Referer':    ('https://www.tiktok.com/' if is_tiktok
@@ -6237,10 +6392,13 @@ def proxy_thumbnail():
             else 'https://www.reddit.com/' if is_reddit
             else 'https://www.quora.com/' if is_quora
             else 'https://rumble.com/' if is_rumble
+            else 'https://vk.com/' if is_vk
+            else 'https://odysee.com/' if is_odysee
+            else 'https://www.bilibili.com/' if is_bilibili
             else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        skip_cookies = is_twitter or is_pinterest or is_tiktok or is_linkedin or is_reddit or is_quora or is_rumble
+        skip_cookies = is_twitter or is_pinterest or is_tiktok or is_linkedin or is_reddit or is_quora or is_rumble or is_bilibili or is_vk or is_odysee
         if not skip_cookies:
             cookies = load_cookies()
             if cookies:

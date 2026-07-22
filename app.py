@@ -4658,6 +4658,7 @@ def _fetch_rumble_media(url):
     where video_urls is a dict like {'360': 'url', '480': 'url', ...}
     or (None, None, None, None) on failure.
     """
+    import re
     logger.info(f"📡 Fetching Rumble page: {url}")
     headers = {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '

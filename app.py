@@ -490,6 +490,20 @@ def detect_url_type(url):
             return 'linkedin_profile'
         return 'linkedin_video'
 
+    # ── Reddit ───────────────────────────────────────────────────────────
+    if 'reddit.com' in url:
+        if '/comments/' in url or '/r/' in url:
+            return 'reddit_post'
+        return 'reddit_profile'   # user or subreddit
+
+    # ── Quora ────────────────────────────────────────────────────────────
+    if 'quora.com' in url or 'qr.ae' in url:
+        if '/answer/' in url or '/q/' in url or '/profile/' in url:
+            return 'quora_post'
+        if 'qr.ae' in url:
+            return 'quora_post'   # shortened link — always a post
+        return 'quora_profile'
+
     # ── Generic/Unknown website (try with yt-dlp) ────────────────────────
     # If it's a valid URL from an unknown domain, mark it as 'generic'
     # so the frontend knows it's an experimental download
@@ -889,6 +903,120 @@ def linkedin_downloader():
     )
 
 
+# ── Reddit ─────────────────────────────────────────────────────────────────────
+@app.route('/reddit-video-downloader')
+@app.route('/reddit-downloader')
+def reddit_downloader_page():
+    reddit_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Reddit Video Downloader",
+        "url": "https://quicksavevideos.com/reddit-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download Reddit videos and images for free online. Paste any Reddit post URL and save MP4 videos and photos in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Reddit Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos helps you <strong>download Reddit videos and images</strong> effortlessly. 
+        Paste any Reddit post URL and save the media directly to your device. Works with videos, 
+        GIFs, and images from any subreddit.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Reddit Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a Reddit post with a video, GIF, or image you want to save.</li>
+        <li>Copy the post URL from your browser's address bar or the Share button.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Reddit videos on mobile?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Works on iPhone, Android, and any device with a modern browser.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Reddit downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Does it work for Reddit GIFs?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Reddit GIFs and vReddit videos are supported and download as MP4.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free Reddit Video Downloader Online — Save Videos & Images | QuickSaveVideos',
+        page_description='Download Reddit videos and images for free online. Paste any Reddit post URL and save MP4 videos and photos in HD quality. Works on mobile, no login required.',
+        page_keywords='reddit video downloader, reddit video saver, download reddit videos, reddit media downloader, save reddit video, reddit mp4 download',
+        page_canonical='https://quicksavevideos.com/reddit-video-downloader',
+        page_h1='🤖 Free Reddit Video Downloader — Save Post Videos & Images',
+        page_subtitle='Paste any Reddit post URL to download the video, GIF, or image in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=reddit_jsonld,
+    )
+
+
+# ── Quora ──────────────────────────────────────────────────────────────────────
+@app.route('/quora-video-downloader')
+@app.route('/quora-downloader')
+def quora_downloader_page():
+    quora_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Quora Video Downloader",
+        "url": "https://quicksavevideos.com/quora-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download Quora videos and images for free online. Paste any Quora answer or post URL and save media in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Quora Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download Quora videos and images</strong> easily. 
+        Paste any Quora answer or post URL and save the media directly to your device. 
+        Works with videos, GIFs, and images from any Quora post.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Quora Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a Quora answer or post with a video or image you want to save.</li>
+        <li>Copy the URL from your browser's address bar or use the Share button.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Quora videos on mobile?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Works on iPhone, Android, and any device with a modern browser.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Quora downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free Quora Video Downloader Online — Save Videos & Images | QuickSaveVideos',
+        page_description='Download Quora videos and images for free online. Paste any Quora answer or post URL and save MP4 videos and photos in HD quality. Works on mobile, no login required.',
+        page_keywords='quora video downloader, quora video saver, download quora videos, quora media downloader, save quora video, quora mp4 download',
+        page_canonical='https://quicksavevideos.com/quora-video-downloader',
+        page_h1='📋 Free Quora Video Downloader — Save Post Videos & Images',
+        page_subtitle='Paste any Quora answer or post URL to download the video or image in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=quora_jsonld,
+    )
+
+
 # ── SEO Guide Pages ──
 
 @app.route('/how-to-download-instagram-videos')
@@ -918,6 +1046,30 @@ def guide_pinterest():
 @app.route('/how-to-download-linkedin-videos')
 def guide_linkedin():
     return render_template('guide-linkedin.html')
+
+
+@app.route('/how-to-download-reddit-videos')
+def guide_reddit():
+    return render_template('index.html',
+        page_title='How to Download Reddit Videos — Free Reddit Video Downloader Guide | QuickSaveVideos',
+        page_description='Learn how to download Reddit videos and images for free. Step-by-step guide to save any Reddit post media to your device. Works for videos, GIFs, and photos.',
+        page_keywords='how to download reddit videos, reddit video download guide, save reddit videos, reddit video saver tutorial',
+        page_canonical='https://quicksavevideos.com/how-to-download-reddit-videos',
+        page_h1='🤖 How to Download Reddit Videos — Free Guide',
+        page_subtitle='Learn how to save any Reddit post media including videos, GIFs, and images in just a few clicks.',
+    )
+
+
+@app.route('/how-to-download-quora-videos')
+def guide_quora():
+    return render_template('index.html',
+        page_title='How to Download Quora Videos — Free Quora Video Downloader Guide | QuickSaveVideos',
+        page_description='Learn how to download Quora videos and images for free. Step-by-step guide to save media from any Quora answer or post.',
+        page_keywords='how to download quora videos, quora video download guide, save quora videos, quora video saver tutorial',
+        page_canonical='https://quicksavevideos.com/how-to-download-quora-videos',
+        page_h1='📋 How to Download Quora Videos — Free Guide',
+        page_subtitle='Learn how to save media from any Quora answer or post in just a few clicks.',
+    )
 
 
 @app.route('/robots.txt')
@@ -1012,6 +1164,26 @@ def sitemap():
   </url>
   <url>
     <loc>https://quicksavevideos.com/how-to-download-linkedin-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/reddit-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/quora-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-reddit-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-quora-videos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -1863,6 +2035,42 @@ def extract_preview_info(url):
 
         except Exception as e:
             logger.warning(f"⚠️ Story preview failed: {e}")
+
+    if preview_data:
+        return preview_data
+
+    # ── Method 7: Reddit Embed / JSON API (for posts where yt-dlp + HTML scrape fail) ──
+    if not preview_data and 'reddit.com' in url:
+        # 7a: Try embed.reddit.com (no auth, reliable)
+        try:
+            logger.info("🔍 Trying Reddit embed for preview...")
+            post_id = _extract_reddit_post_id(url)
+            if post_id:
+                media_url, _ = _fetch_reddit_embed_media(post_id)
+                if media_url:
+                    preview_data['thumbnail'] = media_url
+                    preview_data['is_video'] = ('v.redd.it' in media_url)
+                    preview_data['type'] = 'video' if preview_data['is_video'] else 'photo'
+                    logger.info(f"✅ Reddit embed preview: {media_url[:80]}")
+        except Exception as e:
+            logger.warning(f"⚠️ Reddit embed preview failed: {e}")
+
+        # 7b: Try Reddit JSON API (if embed didn't find title/description)
+        if not preview_data.get('title'):
+            try:
+                logger.info("🔍 Trying Reddit JSON API for preview...")
+                json_url = ('https://www.reddit.com/oembed?url=' + url.split('?')[0] +
+                            '&format=json')
+                resp = requests.get(json_url, headers={'User-Agent': get_random_user_agent()}, timeout=15)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    preview_data['title'] = data.get('title', '')
+                    if not preview_data.get('thumbnail'):
+                        preview_data['thumbnail'] = data.get('thumbnail_url', '')
+                    preview_data['description'] = data.get('author_name', '')
+                    logger.info("✅ Reddit oEmbed preview succeeded")
+            except Exception as e:
+                logger.warning(f"⚠️ Reddit oEmbed preview failed: {e}")
 
     if preview_data:
         return preview_data
@@ -3102,17 +3310,34 @@ def download():
                 return result
             return jsonify({'error': 'LinkedIn download failed. The post may require login or contain no downloadable media.'}), 400
 
-        # ── Generic fallback — try yt-dlp for any other site ──
-        else:
+        # ── Reddit ──
+        if 'reddit.com' in url:
             if not YTDLP_AVAILABLE:
-                return jsonify({'error': 'yt-dlp not available on this server'}), 500
-            logger.info(f"🔄 Trying generic yt-dlp download for unknown site: {url}")
-            result = download_generic(url, quality)
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_reddit(url, quality)
             if result:
-                logger.info("✅ Generic download succeeded")
                 return result
-            logger.warning("⚠️ Generic download failed")
-            return jsonify({'error': '⚠️ Could not download from this URL. The site may not be supported, the video may be private, or require authentication.'}), 400
+            return jsonify({'error': 'Reddit download failed. The post may be private or contain no media.'}), 400
+
+        # ── Quora ──
+        if 'quora.com' in url or 'qr.ae' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_quora(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'Quora download failed. The post may be private or contain no media.'}), 400
+
+        # ── Generic fallback — try yt-dlp for any other site ──
+        if not YTDLP_AVAILABLE:
+            return jsonify({'error': 'yt-dlp not available on this server'}), 500
+        logger.info(f"🔄 Trying generic yt-dlp download for unknown site: {url}")
+        result = download_generic(url, quality)
+        if result:
+            logger.info("✅ Generic download succeeded")
+            return result
+        logger.warning("⚠️ Generic download failed")
+        return jsonify({'error': '⚠️ Could not download from this URL. The site may not be supported, the video may be private, or require authentication.'}), 400
 
     except Exception as e:
         logger.error(f"❌ Download error: {e}", exc_info=True)
@@ -3153,6 +3378,24 @@ LINKEDIN_FORMATS = {
     '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
     'audio': 'bestaudio',
 }
+
+REDDIT_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+QUORA_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+# Facebook doesn't use a separate dict — format selection is inline in download_facebook
 
 
 def _is_format_unavailable_error(err_text):
@@ -4097,6 +4340,167 @@ def download_facebook(url, quality='best'):
         return None
 
 
+def _extract_reddit_post_id(url):
+    """Extract Reddit post ID (e.g. '1v2z83b') from a Reddit URL."""
+    import re
+    m = re.search(r'/comments/([a-z0-9]+)', url)
+    if m:
+        return m.group(1)
+    # Try reddit.com/s/ short URLs — follow redirect to canonical URL
+    if '/s/' in url:
+        try:
+            r = requests.get(url, headers={'User-Agent': get_random_user_agent()},
+                             timeout=15, allow_redirects=True)
+            if r.status_code == 200:
+                m = re.search(r'/comments/([a-z0-9]+)', r.url)
+                if m:
+                    return m.group(1)
+        except Exception:
+            pass
+    return None
+
+
+def _fetch_reddit_embed_media(post_id):
+    """Fetch direct media URL from embed.reddit.com for a post ID."""
+    try:
+        embed_url = f'https://embed.reddit.com/r/_/comments/{post_id}/'
+        logger.info(f"   Fetching Reddit embed: {embed_url}")
+        r = requests.get(embed_url, headers={'User-Agent': get_random_user_agent()},
+                         timeout=15)
+        if r.status_code != 200:
+            logger.warning(f"   Embed returned {r.status_code}")
+            return None, None
+        html = r.text
+        import re
+        # Look for direct i.redd.it / v.redd.it URLs in the embed HTML
+        media_urls = re.findall(r'(https://(?:i\.redd\.it|v\.redd\.it|preview\.redd\.it)/[^"\'<&\s]+)', html)
+        if media_urls:
+            # Prefer i.redd.it (images) and v.redd.it (videos) over preview.redd.it
+            for mu in media_urls:
+                if 'i.redd.it' in mu or 'v.redd.it' in mu:
+                    # Clean trailing garbage
+                    clean = mu.split('&quot')[0].split('"')[0].split('&')[0]
+                    ext = os.path.splitext(clean.split('?')[0])[1].lstrip('.') or 'jpg'
+                    return clean, ext
+        return None, None
+    except Exception as e:
+        logger.warning(f"   Reddit embed fetch failed: {e}")
+        return None, None
+
+
+def download_reddit(url, quality='best'):
+    """Download a Reddit post (video/image) using yt-dlp."""
+    is_audio = (quality == 'audio')
+    logger.info(f"🤖 Reddit download: {url} | quality={quality}")
+
+    # Resolve short links (reddit.com/s/...) to canonical URL before yt-dlp
+    if '/s/' in url:
+        try:
+            r = requests.get(url, headers={'User-Agent': get_random_user_agent()},
+                             timeout=15, allow_redirects=True)
+            if r.status_code == 200 and '/comments/' in r.url:
+                url = r.url.split('?')[0]
+                logger.info(f"   Resolved short URL to: {url}")
+        except Exception as e:
+            logger.warning(f"   Could not resolve short URL: {e}")
+
+    if YTDLP_AVAILABLE:
+        try:
+            fmt = REDDIT_FORMATS.get(quality, REDDIT_FORMATS['best'])
+            if is_audio:
+                candidates = [fmt, 'bestaudio/best', 'best']
+            elif FFMPEG_AVAILABLE:
+                candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            else:
+                candidates = [fmt, 'best[ext=mp4]/best', 'best']
+
+            filename, file_size = _download_with_format_fallback(
+                url,
+                os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+                candidates,
+                timeout=60,
+                merge=(not is_audio),
+                scan_exts=('mp4', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'm4a')
+            )
+            if filename:
+                logger.info(f"✅ Reddit: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
+        except Exception as e:
+            logger.warning(f"⚠️ Reddit download failed: {e}")
+
+    # Fallback: try to extract direct media URL from embed.reddit.com
+    post_id = _extract_reddit_post_id(url)
+    if post_id:
+        logger.info(f"   Trying Reddit embed fallback for post ID: {post_id}")
+        media_url, ext = _fetch_reddit_embed_media(post_id)
+        if media_url:
+            logger.info(f"   Embed found media: {media_url[:80]}...")
+            result = _download_raw_url(media_url, ext or 'jpg')
+            if result:
+                return result
+
+    return jsonify({'error': '⚠️ Could not download from this Reddit post. The post may contain no media, be private, or be unsupported. Try adding Reddit cookies in ⚙️ Settings.'}), 400
+
+
+def download_quora(url, quality='best'):
+    """Download a Quora post (video/image) using yt-dlp."""
+    is_audio = (quality == 'audio')
+    logger.info(f"📋 Quora download: {url} | quality={quality}")
+
+    # Resolve short links (qr.ae) to canonical Quora URL before yt-dlp
+    if 'qr.ae' in url:
+        try:
+            r = requests.get(url, headers={'User-Agent': get_random_user_agent()},
+                             timeout=15, allow_redirects=True)
+            # Quora often returns 403 from Cloudflare; check redirect chain anyway
+            if 'quora.com' in (r.url or ''):
+                url = r.url.split('?')[0]
+                logger.info(f"   Resolved short URL to: {url}")
+            elif r.is_redirect or any('quora.com' in h.url for h in r.history):
+                url = r.url.split('?')[0]
+                logger.info(f"   Resolved short URL (via history) to: {url}")
+        except Exception as e:
+            logger.warning(f"   Could not resolve short URL: {e}")
+
+    if YTDLP_AVAILABLE:
+        try:
+            fmt = QUORA_FORMATS.get(quality, QUORA_FORMATS['best'])
+            if is_audio:
+                candidates = [fmt, 'bestaudio/best', 'best']
+            elif FFMPEG_AVAILABLE:
+                candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            else:
+                candidates = [fmt, 'best[ext=mp4]/best', 'best']
+
+            filename, file_size = _download_with_format_fallback(
+                url,
+                os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+                candidates,
+                timeout=60,
+                merge=(not is_audio),
+                scan_exts=('mp4', 'mkv', 'webm', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'mp3', 'm4a')
+            )
+            if filename:
+                logger.info(f"✅ Quora: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
+        except Exception as e:
+            err_str = str(e).lower()
+            if 'cloudflare' in err_str or 'impersonate' in err_str:
+                logger.warning("⛔ Quora blocked by Cloudflare anti-bot protection")
+                return jsonify({'error': '⛔ Quora uses Cloudflare anti-bot protection. This downloader cannot access Quora directly. Try using a direct media URL instead.'}), 400
+            logger.warning(f"⚠️ Quora download failed: {e}")
+
+    return jsonify({'error': '⚠️ Could not download from this Quora post. The post may contain no media, be private, or use anti-bot protection.'}), 400
+
+
 def download_youtube(url, quality='best', content_type='both'):
     """Download a YouTube video using auto-best available format.
 
@@ -4968,13 +5372,15 @@ def proxy_thumbnail():
     img_url = request.args.get('url', '').strip()
     if not img_url:
         return jsonify({'error': 'url param required'}), 400
-    # Only allow Instagram / Facebook / YouTube CDN domains
+    # Only allow known CDN domains
     allowed = ('instagram.com', 'cdninstagram.com', 'fbcdn.net', 'fbsbx.com',
                'ytimg.com', 'ggpht.com', 'googleusercontent.com',
                'twimg.com', 'pbs.twimg.com',
                'pinimg.com', 'i.pinimg.com',
                'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktok.com',
-               'licdn.com', 'linkedin.com')
+               'licdn.com', 'linkedin.com',
+               'reddit.com', 'redd.it', 'preview.redd.it', 'i.redd.it',
+               'quora.com', 'qph.cf2.quoracdn.net', 'quoracdn.net')
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
@@ -4982,16 +5388,20 @@ def proxy_thumbnail():
         is_pinterest  = 'pinimg.com' in img_url
         is_tiktok     = 'tiktok' in img_url
         is_linkedin   = 'licdn.com' in img_url or 'linkedin.com' in img_url
+        is_reddit     = 'reddit.com' in img_url or 'redd.it' in img_url
+        is_quora      = 'quoracdn.net' in img_url or 'quora.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
             'Referer':    ('https://www.tiktok.com/' if is_tiktok
                            else 'https://www.pinterest.com/' if is_pinterest
             else 'https://twitter.com/' if is_twitter
             else 'https://www.linkedin.com/' if is_linkedin
+            else 'https://www.reddit.com/' if is_reddit
+            else 'https://www.quora.com/' if is_quora
             else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        if not is_twitter and not is_pinterest and not is_tiktok and not is_linkedin:
+        if not is_twitter and not is_pinterest and not is_tiktok and not is_linkedin and not is_reddit and not is_quora:
             cookies = load_cookies()
             if cookies:
                 headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)

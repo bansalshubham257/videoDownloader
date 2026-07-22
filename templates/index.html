@@ -3137,6 +3137,8 @@
         'facebook': '/how-to-download-facebook-videos',
         'pinterest': '/how-to-download-pinterest-videos',
         'linkedin': '/how-to-download-linkedin-videos',
+        'reddit': '/how-to-download-reddit-videos',
+        'quora': '/how-to-download-quora-videos',
     };
     function updateGuideLink(platform) {
         const el = document.getElementById('guide-link');
@@ -3289,8 +3291,14 @@
             } else if (type === 'facebook_story') {
                 currentPlatform = 'facebook';
                 await loadSinglePost(url, 'facebook');
+            } else if (type === 'reddit_post') {
+                currentPlatform = 'reddit';
+                await loadSinglePost(url, 'reddit');
+            } else if (type === 'quora_post') {
+                currentPlatform = 'quora';
+                await loadSinglePost(url, 'quora');
             } else if (type === 'generic') {
-                // generic_video — any URL yt-dlp might support (Vimeo, Twitch, Reddit, etc.)
+                // generic_video — any URL yt-dlp might support (Vimeo, Twitch, etc.)
                 currentPlatform = 'generic';
                 await loadSinglePost(url, 'generic');
             } else {
@@ -3560,6 +3568,8 @@
         else if (platform === 'tiktok')         { tkOpts.classList.add('show'); dlBtn.classList.add('tk-btn'); }
         else if (platform === 'linkedin')       { liOpts.classList.add('show'); dlBtn.classList.add('li-btn'); }
         else if (platform === 'pinterest')      { dlBtn.classList.add('pi-btn'); }
+        else if (platform === 'reddit')         { dlBtn.classList.add('generic-btn'); }
+        else if (platform === 'quora')          { dlBtn.classList.add('generic-btn'); }
         else if (platform === 'generic')        { dlBtn.classList.add('generic-btn'); }
         else if (platform === 'instagram_story'){ dlBtn.classList.add('story-btn'); }   // stories & highlights
         else                                    { igOpts.style.display = 'flex'; }
@@ -3657,6 +3667,8 @@
                    : currentPlatform === 'tiktok'         ? { url: currentUrl, quality: tkQuality }
                    : currentPlatform === 'linkedin'       ? { url: currentUrl, quality: liQuality }
                    : currentPlatform === 'pinterest'      ? { url: currentUrl }
+                   : currentPlatform === 'reddit'         ? { url: currentUrl }
+                   : currentPlatform === 'quora'          ? { url: currentUrl }
                    : currentPlatform === 'generic'        ? { url: currentUrl }
                    : currentPlatform === 'instagram_story'? { url: currentUrl }
                    : { url: currentUrl, content_type: document.querySelector('input[name="ctype"]:checked').value };

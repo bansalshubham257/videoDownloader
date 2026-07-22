@@ -2159,15 +2159,16 @@ def extract_preview_info(url):
         try:
             logger.info("🔍 Trying Rumble page fetch for preview...")
             video_urls, title, thumbnail, duration = _fetch_rumble_media(url)
-            if thumbnail:
+            if thumbnail or video_urls or title:
                 preview_data['thumbnail'] = thumbnail
                 preview_data['is_video'] = bool(video_urls)
                 preview_data['type'] = 'video' if video_urls else 'photo'
-                logger.info(f"✅ Rumble preview: thumbnail={thumbnail[:80]}")
-            if title:
-                preview_data['title'] = title
-            if duration:
-                preview_data['duration'] = duration
+                if thumbnail:
+                    logger.info(f"✅ Rumble preview: thumbnail={thumbnail[:80]}")
+                if title:
+                    preview_data['title'] = title
+                if duration:
+                    preview_data['duration'] = duration
         except Exception as e:
             logger.warning(f"⚠️ Rumble preview failed: {e}")
 
@@ -4766,6 +4767,28 @@ def _fetch_rumble_media(url):
                 url_val = m.group(1).split('"')[0].split("'")[0].split('&')[0]
                 if url_val not in video_urls.values():
                     video_urls['source'] = url_val
+
+    # Method 4: Try Rumble oEmbed API for metadata (title, thumbnail)
+    if not title or not thumbnail:
+        try:
+            oembed_url = f"https://rumble.com/api/Media/oembed.json?url={url.split('?')[0].split('#')[0]}"
+            if CURL_CFFI_AVAILABLE:
+                oresp = _cffi_req.get(oembed_url, impersonate='chrome131', timeout=15)
+            else:
+                oresp = requests.get(oembed_url, headers=headers, timeout=15)
+            if oresp.status_code == 200:
+                odata = oresp.json()
+                if not title:
+                    title = odata.get('title') or title
+                if not thumbnail:
+                    thumbnail = odata.get('thumbnail_url') or odata.get('thumbnail') or thumbnail
+                if not duration:
+                    dur = odata.get('duration')
+                    if dur:
+                        mins, secs = divmod(int(dur), 60)
+                        duration = f"{mins}:{secs:02d}"
+        except Exception as e:
+            logger.info(f"   Rumble oEmbed failed: {e}")
 
     logger.info(f"📡 Rumble page parsed: {len(video_urls)} qualities, title={title[:50] if title else None}")
     return video_urls, title, thumbnail, duration

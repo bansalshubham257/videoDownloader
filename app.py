@@ -4668,11 +4668,26 @@ def _fetch_rumble_media(url):
     }
     try:
         if CURL_CFFI_AVAILABLE:
-            resp = _cffi_req.get(url, headers=headers, impersonate='chrome', timeout=30)
+            profiles = ['chrome142', 'chrome136', 'chrome131', 'safari18_0', 'firefox144']
+            html = None
+            for profile in profiles:
+                try:
+                    resp = _cffi_req.get(url, headers=headers, impersonate=profile, timeout=30)
+                    if resp.status_code == 200:
+                        html = resp.text
+                        logger.info(f"   ✅ curl_cffi Rumble succeeded with {profile}")
+                        break
+                    else:
+                        logger.info(f"   curl_cffi Rumble {profile} returned {resp.status_code}")
+                except Exception as e:
+                    logger.info(f"   curl_cffi Rumble {profile} failed: {e}")
+            if html is None:
+                logger.warning("   All curl_cffi profiles failed for Rumble")
+                return None, None, None, None
         else:
             resp = requests.get(url, headers=headers, timeout=30)
-        resp.raise_for_status()
-        html = resp.text
+            resp.raise_for_status()
+            html = resp.text
     except Exception as e:
         logger.warning(f"⚠️ Failed to fetch Rumble page: {e}")
         return None, None, None, None
@@ -4771,7 +4786,8 @@ def download_rumble(url, quality='best'):
                 candidates,
                 timeout=60,
                 merge=(not is_audio),
-                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a'),
+                ydl_overrides={'extractor_args': {'generic': {'impersonate': ['']}}}
             )
             if filename:
                 logger.info(f"✅ Rumble yt-dlp: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")

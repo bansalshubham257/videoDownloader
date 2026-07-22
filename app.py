@@ -96,6 +96,15 @@ except ImportError:
     SELENIUM_AVAILABLE = False
     logger.warning("⚠️ Selenium not available")
 
+# Try to import curl_cffi (for Cloudflare bypass)
+try:
+    from curl_cffi import requests as _cffi_req
+    CURL_CFFI_AVAILABLE = True
+    logger.info("✅ curl_cffi available")
+except ImportError:
+    CURL_CFFI_AVAILABLE = False
+    logger.warning("⚠️ curl_cffi not available - Cloudflare-protected sites (Quora) will not work")
+
 # User agents for rotation
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -2129,6 +2138,19 @@ def extract_preview_info(url):
                     logger.info("✅ Reddit oEmbed preview succeeded")
             except Exception as e:
                 logger.warning(f"⚠️ Reddit oEmbed preview failed: {e}")
+
+    # ── Method 8: Quora curl_cffi page fetch (bypasses Cloudflare) ──
+    if not preview_data and ('quora.com' in url or 'qr.ae' in url) and CURL_CFFI_AVAILABLE:
+        try:
+            logger.info("🔍 Trying Quora page fetch via curl_cffi for preview...")
+            media_url, _ = _fetch_quora_media(url)
+            if media_url:
+                preview_data['thumbnail'] = media_url
+                preview_data['is_video'] = False
+                preview_data['type'] = 'photo'
+                logger.info(f"✅ Quora curl_cffi preview: {media_url[:80]}")
+        except Exception as e:
+            logger.warning(f"⚠️ Quora curl_cffi preview failed: {e}")
 
     if preview_data:
         return preview_data
@@ -4504,26 +4526,62 @@ def download_reddit(url, quality='best'):
     return jsonify({'error': '⚠️ Could not download from this Reddit post. The post may contain no media, be private, or be unsupported. Try adding Reddit cookies in ⚙️ Settings.'}), 400
 
 
+def _fetch_quora_media(url):
+    """Fetch Quora answer page using curl_cffi to bypass Cloudflare, extract media URLs."""
+    if not CURL_CFFI_AVAILABLE:
+        return None, None
+    try:
+        from curl_cffi import requests as cffi_req
+        logger.info(f"   Fetching Quora page via curl_cffi...")
+        resp = cffi_req.get(url, impersonate='chrome', timeout=20)
+        if resp.status_code != 200:
+            logger.warning(f"   Quora page returned {resp.status_code}")
+            return None, None
+        html = resp.text
+        import re
+        # Look for image URLs in Quora CDN
+        images = re.findall(r'(https://qph\.cf2\.quoracdn\.net/main-qimg-[^"\'\\&\s]+)', html)
+        if images:
+            # Return the first actual content image (skip thumbnails/profile pics)
+            for img in images:
+                clean = img.split('\\')[0].split('&')[0].split('"')[0]
+                if 'main-qimg' in clean:
+                    ext = 'jpg'
+                    if '/png' in clean or '.png' in clean:
+                        ext = 'png'
+                    elif '/gif' in clean or '.gif' in clean:
+                        ext = 'gif'
+                    return clean, ext
+        return None, None
+    except Exception as e:
+        logger.warning(f"   Quora page fetch failed: {e}")
+        return None, None
+
+
 def download_quora(url, quality='best'):
-    """Download a Quora post (video/image) using yt-dlp."""
+    """Download a Quora post (video/image) using yt-dlp, with curl_cffi fallback."""
     is_audio = (quality == 'audio')
     logger.info(f"📋 Quora download: {url} | quality={quality}")
 
-    # Resolve short links (qr.ae) to canonical Quora URL before yt-dlp
+    # Resolve short links (qr.ae) to canonical Quora URL
+    resolved_url = None
     if 'qr.ae' in url:
         try:
             r = requests.get(url, headers={'User-Agent': get_random_user_agent()},
                              timeout=15, allow_redirects=True)
-            # Quora often returns 403 from Cloudflare; check redirect chain anyway
             if 'quora.com' in (r.url or ''):
-                url = r.url.split('?')[0]
-                logger.info(f"   Resolved short URL to: {url}")
-            elif r.is_redirect or any('quora.com' in h.url for h in r.history):
-                url = r.url.split('?')[0]
-                logger.info(f"   Resolved short URL (via history) to: {url}")
+                resolved_url = r.url.split('?')[0]
+                logger.info(f"   Resolved short URL to: {resolved_url}")
+            elif r.history and any('quora.com' in h.url for h in r.history):
+                resolved_url = r.url.split('?')[0]
+                logger.info(f"   Resolved short URL (via history) to: {resolved_url}")
         except Exception as e:
             logger.warning(f"   Could not resolve short URL: {e}")
 
+    if resolved_url:
+        url = resolved_url
+
+    # ── Method 1: yt-dlp ──
     if YTDLP_AVAILABLE:
         try:
             fmt = QUORA_FORMATS.get(quality, QUORA_FORMATS['best'])
@@ -4552,9 +4610,18 @@ def download_quora(url, quality='best'):
         except Exception as e:
             err_str = str(e).lower()
             if 'cloudflare' in err_str or 'impersonate' in err_str:
-                logger.warning("⛔ Quora blocked by Cloudflare anti-bot protection")
-                return jsonify({'error': '⛔ Quora uses Cloudflare anti-bot protection. This downloader cannot access Quora directly. Try using a direct media URL instead.'}), 400
-            logger.warning(f"⚠️ Quora download failed: {e}")
+                logger.info("⛔ yt-dlp blocked by Cloudflare, trying curl_cffi fallback...")
+            else:
+                logger.warning(f"⚠️ Quora yt-dlp failed: {e}")
+
+    # ── Method 2: curl_cffi page fetch (bypasses Cloudflare) ──
+    logger.info("   Trying curl_cffi page fetch for Quora media...")
+    media_url, ext = _fetch_quora_media(url)
+    if media_url:
+        logger.info(f"   ✅ Found Quora media: {media_url[:80]}...")
+        result = _download_raw_url(media_url, ext or 'jpg')
+        if result:
+            return result
 
     return jsonify({'error': '⚠️ Could not download from this Quora post. The post may contain no media, be private, or use anti-bot protection.'}), 400
 
@@ -5515,7 +5582,8 @@ def status():
         'instagrapi': INSTAGRAPI_AVAILABLE,
         'instaloader': INSTALOADER_AVAILABLE,
         'selenium': SELENIUM_AVAILABLE,
-        'methods': [m for m in ['yt-dlp', 'Embed extraction', 'Instaloader', 'Instagrapi', 'Direct HTTP']
+        'curl_cffi': CURL_CFFI_AVAILABLE,
+        'methods': [m for m in ['yt-dlp', 'Embed extraction', 'Instaloader', 'Instagrapi', 'Direct HTTP', 'curl_cffi']
                     if (m == 'yt-dlp' and YTDLP_AVAILABLE)
                     or m == 'Embed extraction'
                     or (m == 'Instaloader' and INSTALOADER_AVAILABLE)

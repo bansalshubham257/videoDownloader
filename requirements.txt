@@ -6,3 +6,4 @@ instaloader
 requests==2.31.0
 gunicorn==21.2.0
 Pillow>=8.1.1
+curl_cffi>=0.15.0

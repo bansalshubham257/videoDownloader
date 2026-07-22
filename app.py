@@ -513,6 +513,26 @@ def detect_url_type(url):
             return 'quora_post'   # shortened link — always a post
         return 'quora_profile'
 
+    # ── Bilibili ──────────────────────────────────────────────────────────
+    if 'bilibili.com' in url:
+        if '/video/' in url or '/bangumi/' in url:
+            return 'bilibili_video'
+        return 'bilibili_video'
+
+    # ── BitChute ──────────────────────────────────────────────────────────
+    if 'bitchute.com' in url:
+        if '/video/' in url:
+            return 'bitchute_video'
+        return 'bitchute_video'
+
+    # ── Dailymotion ───────────────────────────────────────────────────────
+    if 'dailymotion.com' in url or 'dai.ly' in url:
+        return 'dailymotion_video'
+
+    # ── Odysee ────────────────────────────────────────────────────────────
+    if 'odysee.com' in url or 'lbry.tv' in url:
+        return 'odysee_video'
+
     # ── Rumble ───────────────────────────────────────────────────────────
     if 'rumble.com' in url:
         if '/shorts/' in url or '/v' in url:
@@ -1090,6 +1110,215 @@ def rumble_downloader_page():
     )
 
 
+# ── Bilibili ──────────────────────────────────────────────────────────────────────
+@app.route('/bilibili-video-downloader')
+@app.route('/bilibili-downloader')
+def bilibili_downloader_page():
+    bilibili_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Bilibili Video Downloader",
+        "url": "https://quicksavevideos.com/bilibili-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download Bilibili videos for free online. Paste any Bilibili video URL and save in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Bilibili Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download Bilibili videos</strong> easily. 
+        Paste any Bilibili video URL and save the video directly to your device in HD quality.
+        Works with standard Bilibili videos and Bangumi episodes.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Bilibili Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a Bilibili video you want to save.</li>
+        <li>Copy the URL from your browser's address bar.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Bilibili videos in HD?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Available qualities depend on the video. Bilibili supports up to 1080p+ for most content.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Bilibili downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free Bilibili Video Downloader Online — Save Videos | QuickSaveVideos',
+        page_description='Download Bilibili videos for free online. Paste any Bilibili video URL and save MP4 videos in HD quality. Works on mobile, no login required.',
+        page_keywords='bilibili video downloader, bilibili downloader, download bilibili videos, bilibili mp4 download, bilibili video saver',
+        page_canonical='https://quicksavevideos.com/bilibili-video-downloader',
+        page_h1='📺 Free Bilibili Video Downloader — Save Videos',
+        page_subtitle='Paste any Bilibili video URL to download in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=bilibili_jsonld,
+    )
+
+
+# ── BitChute ──────────────────────────────────────────────────────────────────────
+@app.route('/bitchute-video-downloader')
+@app.route('/bitchute-downloader')
+def bitchute_downloader_page():
+    bitchute_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "BitChute Video Downloader",
+        "url": "https://quicksavevideos.com/bitchute-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download BitChute videos for free online. Paste any BitChute video URL and save in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">BitChute Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download BitChute videos</strong> easily.
+        Paste any BitChute video URL and save the video directly to your device in HD quality.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download BitChute Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a BitChute video you want to save.</li>
+        <li>Copy the URL from your browser's address bar.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this BitChute downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free BitChute Video Downloader Online — Save Videos | QuickSaveVideos',
+        page_description='Download BitChute videos for free online. Paste any BitChute video URL and save MP4 videos in HD quality. Works on mobile, no login required.',
+        page_keywords='bitchute video downloader, bitchute downloader, download bitchute videos, bitchute mp4 download, bitchute video saver',
+        page_canonical='https://quicksavevideos.com/bitchute-video-downloader',
+        page_h1='🎬 Free BitChute Video Downloader — Save Videos',
+        page_subtitle='Paste any BitChute video URL to download in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=bitchute_jsonld,
+    )
+
+
+# ── Dailymotion ──────────────────────────────────────────────────────────────────
+@app.route('/dailymotion-video-downloader')
+@app.route('/dailymotion-downloader')
+def dailymotion_downloader_page():
+    dailymotion_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Dailymotion Video Downloader",
+        "url": "https://quicksavevideos.com/dailymotion-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download Dailymotion videos for free online. Paste any Dailymotion video URL and save in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Dailymotion Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download Dailymotion videos</strong> easily.
+        Paste any Dailymotion video URL and save the video directly to your device in HD quality.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Dailymotion Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a Dailymotion video you want to save.</li>
+        <li>Copy the URL from your browser's address bar.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Dailymotion videos in HD?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Dailymotion supports up to 1080p for most videos. Select your preferred quality after pasting the URL.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Dailymotion downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free Dailymotion Video Downloader Online — Save Videos | QuickSaveVideos',
+        page_description='Download Dailymotion videos for free online. Paste any Dailymotion video URL and save MP4 videos in HD quality. Works on mobile, no login required.',
+        page_keywords='dailymotion video downloader, dailymotion downloader, download dailymotion videos, dailymotion mp4 download, dailymotion video saver',
+        page_canonical='https://quicksavevideos.com/dailymotion-video-downloader',
+        page_h1='🎥 Free Dailymotion Video Downloader — Save Videos',
+        page_subtitle='Paste any Dailymotion video URL to download in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=dailymotion_jsonld,
+    )
+
+
+# ── Odysee ───────────────────────────────────────────────────────────────────────
+@app.route('/odysee-video-downloader')
+@app.route('/odysee-downloader')
+def odysee_downloader_page():
+    odysee_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Odysee Video Downloader",
+        "url": "https://quicksavevideos.com/odysee-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download Odysee videos for free online. Paste any Odysee or LBRY video URL and save in HD quality.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Odysee Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download Odysee and LBRY videos</strong> easily.
+        Paste any Odysee or LBRY.tv video URL and save the video directly to your device in HD quality.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Odysee Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find an Odysee or LBRY video you want to save.</li>
+        <li>Copy the URL from your browser's address bar.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Odysee downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free Odysee Video Downloader Online — Save Videos | QuickSaveVideos',
+        page_description='Download Odysee and LBRY videos for free online. Paste any Odysee video URL and save MP4 videos in HD quality. Works on mobile, no login required.',
+        page_keywords='odysee video downloader, odysee downloader, download odysee videos, lbry video downloader, odysee mp4 download, odysee video saver',
+        page_canonical='https://quicksavevideos.com/odysee-video-downloader',
+        page_h1='🎞️ Free Odysee Video Downloader — Save Videos',
+        page_subtitle='Paste any Odysee or LBRY video URL to download in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=odysee_jsonld,
+    )
+
+
 # ── SEO Guide Pages ──
 
 @app.route('/how-to-download-instagram-videos')
@@ -1134,6 +1363,26 @@ def guide_quora():
 @app.route('/how-to-download-rumble-videos')
 def guide_rumble():
     return render_template('guide-rumble.html')
+
+
+@app.route('/how-to-download-bitchute-videos')
+def guide_bitchute():
+    return render_template('guide-bitchute.html')
+
+
+@app.route('/how-to-download-dailymotion-videos')
+def guide_dailymotion():
+    return render_template('guide-dailymotion.html')
+
+
+@app.route('/how-to-download-odysee-videos')
+def guide_odysee():
+    return render_template('guide-odysee.html')
+
+
+@app.route('/how-to-download-bilibili-videos')
+def guide_bilibili():
+    return render_template('guide-bilibili.html')
 
 
 @app.route('/robots.txt')
@@ -1258,6 +1507,46 @@ def sitemap():
   </url>
   <url>
     <loc>https://quicksavevideos.com/how-to-download-rumble-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/bitchute-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-bitchute-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/dailymotion-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-dailymotion-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/odysee-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-odysee-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/bilibili-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-bilibili-videos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -3427,6 +3716,44 @@ def download():
             if result:
                 return result
             return jsonify({'error': 'Quora download failed. The post may be private or contain no media.'}), 400
+
+        # ── Bilibili ──
+        if 'bilibili.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            # Normalize m.bilibili.com → www.bilibili.com (yt-dlp BiliBiliIE only matches www)
+            normalized = url.replace('m.bilibili.com', 'www.bilibili.com').split('?')[0].split('#')[0]
+            result = download_generic(normalized, quality)
+            if result:
+                return result
+            return jsonify({'error': 'Bilibili download failed.'}), 400
+
+        # ── BitChute ──
+        if 'bitchute.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_generic(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'BitChute download failed.'}), 400
+
+        # ── Dailymotion ──
+        if 'dailymotion.com' in url or 'dai.ly' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_generic(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'Dailymotion download failed.'}), 400
+
+        # ── Odysee ──
+        if 'odysee.com' in url or 'lbry.tv' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_generic(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'Odysee download failed.'}), 400
 
         # ── Rumble ──
         if 'rumble.com' in url:

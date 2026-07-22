@@ -2020,9 +2020,12 @@ def extract_preview_info(url):
     import re
 
     # Normalize Bilibili URLs: yt-dlp BiliBiliIE only matches www.bilibili.com, not m.bilibili.com
-    # Also strip trailing slash to prevent www→m redirect
     if 'bilibili.com' in url:
-        url = url.replace('m.bilibili.com', 'www.bilibili.com').rstrip('/')
+        bv_m = re.search(r'(BV[a-zA-Z0-9]+)', url)
+        if bv_m:
+            url = f"https://www.bilibili.com/video/{bv_m.group(1)}"
+        else:
+            url = url.replace('m.bilibili.com', 'www.bilibili.com').rstrip('/')
 
     preview_data = {}
 
@@ -3726,10 +3729,7 @@ def download():
         if 'bilibili.com' in url:
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
-            # Normalize m.bilibili.com → www.bilibili.com (yt-dlp BiliBiliIE only matches www)
-            # Also strip trailing slash to prevent www→m redirect
-            normalized = url.replace('m.bilibili.com', 'www.bilibili.com').rstrip('/')
-            result = download_generic(normalized, quality)
+            result = download_bilibili(url, quality)
             if result:
                 return result
             return jsonify({'error': 'Bilibili download failed.'}), 400
@@ -5136,6 +5136,58 @@ def _fetch_rumble_media(url):
 
     logger.info(f"📡 Rumble page parsed: {len(video_urls)} qualities, title={title[:50] if title else None}")
     return video_urls, title, thumbnail, duration
+
+
+def download_bilibili(url, quality='best'):
+    """Download a Bilibili video using yt-dlp with desktop headers and clean BV URL."""
+    is_audio = (quality == 'audio')
+    logger.info(f"🇨🇳 Bilibili download: {url} | quality={quality}")
+
+    # Extract BV ID to construct clean canonical URL (prevents m.bilibili.com redirects)
+    bv_match = re.search(r'(BV[a-zA-Z0-9]+)', url)
+    if bv_match:
+        clean_url = f"https://www.bilibili.com/video/{bv_match.group(1)}"
+    else:
+        clean_url = url.replace('m.bilibili.com', 'www.bilibili.com').split('?')[0].rstrip('/')
+
+    desktop_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Referer':    'https://www.bilibili.com/',
+    }
+
+    if is_audio:
+        candidates = ['bestaudio/best', 'best']
+    elif FFMPEG_AVAILABLE:
+        fmt_map = {
+            'best':  'bestvideo+bestaudio/best',
+            '1080p': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
+            '720p':  'bestvideo[height<=720]+bestaudio/best[height<=720]',
+            '480p':  'bestvideo[height<=480]+bestaudio/best[height<=480]',
+            '360p':  'bestvideo[height<=360]+bestaudio/best[height<=360]',
+        }
+        candidates = [fmt_map.get(quality, 'bestvideo+bestaudio/best'), 'bestvideo+bestaudio/best', 'best']
+    else:
+        candidates = ['best', 'worst']
+
+    filename, file_size = _download_with_format_fallback(
+        clean_url,
+        os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+        candidates,
+        timeout=60,
+        merge=(not is_audio),
+        scan_exts=('mp4', 'mkv', 'flv', 'webm', 'mp3', 'm4a'),
+        ydl_overrides={'http_headers': desktop_headers}
+    )
+
+    if filename:
+        logger.info(f"✅ Bilibili: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+        return jsonify({
+            'success':   True,
+            'filename':  os.path.basename(filename),
+            'file_size': f"{file_size/(1024*1024):.2f} MB",
+        })
+
+    return jsonify({'error': 'Bilibili download failed. The video may be private or unavailable.'}), 400
 
 
 def download_rumble(url, quality='best'):

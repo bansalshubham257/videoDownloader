@@ -2106,38 +2106,25 @@ def extract_preview_info(url):
     if preview_data:
         return preview_data
 
-    # ── Method 7: Reddit Embed / JSON API (for posts where yt-dlp + HTML scrape fail) ──
+    # ── Method 7: Reddit Embed (no auth, reliable) ──
     if not preview_data and 'reddit.com' in url:
-        # 7a: Try embed.reddit.com (no auth, reliable)
         try:
             logger.info("🔍 Trying Reddit embed for preview...")
             post_id = _extract_reddit_post_id(url)
+            subreddit = _extract_reddit_subreddit(url)
             if post_id:
-                media_url, _ = _fetch_reddit_embed_media(post_id)
+                media_url, _, title, author = _fetch_reddit_embed_media(post_id, subreddit)
                 if media_url:
                     preview_data['thumbnail'] = media_url
                     preview_data['is_video'] = ('v.redd.it' in media_url)
                     preview_data['type'] = 'video' if preview_data['is_video'] else 'photo'
                     logger.info(f"✅ Reddit embed preview: {media_url[:80]}")
+                if title:
+                    preview_data['title'] = title
+                    preview_data['description'] = f"u/{author}" if author else ''
+                    logger.info(f"✅ Reddit embed title: {title[:80]}")
         except Exception as e:
             logger.warning(f"⚠️ Reddit embed preview failed: {e}")
-
-        # 7b: Try Reddit JSON API (if embed didn't find title/description)
-        if not preview_data.get('title'):
-            try:
-                logger.info("🔍 Trying Reddit JSON API for preview...")
-                json_url = ('https://www.reddit.com/oembed?url=' + url.split('?')[0] +
-                            '&format=json')
-                resp = requests.get(json_url, headers={'User-Agent': get_random_user_agent()}, timeout=15)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    preview_data['title'] = data.get('title', '')
-                    if not preview_data.get('thumbnail'):
-                        preview_data['thumbnail'] = data.get('thumbnail_url', '')
-                    preview_data['description'] = data.get('author_name', '')
-                    logger.info("✅ Reddit oEmbed preview succeeded")
-            except Exception as e:
-                logger.warning(f"⚠️ Reddit oEmbed preview failed: {e}")
 
     # ── Method 8: Quora curl_cffi page fetch (bypasses Cloudflare) ──
     if not preview_data and ('quora.com' in url or 'qr.ae' in url) and CURL_CFFI_AVAILABLE:
@@ -4440,18 +4427,41 @@ def _extract_reddit_post_id(url):
     return None
 
 
-def _fetch_reddit_embed_media(post_id):
-    """Fetch direct media URL from embed.reddit.com for a post ID."""
+def _extract_reddit_subreddit(url):
+    """Extract subreddit name from a Reddit URL (e.g. 'whatisit' from r/whatisit/comments/...)."""
+    import re
+    m = re.search(r'/r/([a-zA-Z0-9_]+)', url)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _fetch_reddit_embed_media(post_id, subreddit=None):
+    """Fetch direct media URL from embed.reddit.com for a post ID.
+    Returns (media_url, ext, title, author)."""
     try:
-        embed_url = f'https://embed.reddit.com/r/_/comments/{post_id}/'
+        sub = subreddit or '_'
+        embed_url = f'https://embed.reddit.com/r/{sub}/comments/{post_id}/'
         logger.info(f"   Fetching Reddit embed: {embed_url}")
         r = requests.get(embed_url, headers={'User-Agent': get_random_user_agent()},
                          timeout=15)
         if r.status_code != 200:
             logger.warning(f"   Embed returned {r.status_code}")
-            return None, None
+            return None, None, None, None
         html = r.text
         import re
+
+        # Extract post title from <h1>
+        title = None
+        m = re.search(r'<h1[^>]*>(.*?)</h1>', html, re.DOTALL)
+        if m:
+            title = re.sub(r'<[^>]+>', '', m.group(1)).strip()
+        # Extract author username
+        author = None
+        m = re.search(r'<a[^>]*href="https://www\.reddit\.com/user/([^"/]+)', html)
+        if m:
+            author = m.group(1)
+
         # Look for direct i.redd.it / v.redd.it URLs in the embed HTML
         media_urls = re.findall(r'(https://(?:i\.redd\.it|v\.redd\.it|preview\.redd\.it)/[^"\'<&\s]+)', html)
         if media_urls:
@@ -4461,11 +4471,11 @@ def _fetch_reddit_embed_media(post_id):
                     # Clean trailing garbage
                     clean = mu.split('&quot')[0].split('"')[0].split('&')[0]
                     ext = os.path.splitext(clean.split('?')[0])[1].lstrip('.') or 'jpg'
-                    return clean, ext
-        return None, None
+                    return clean, ext, title, author
+        return None, None, title, author
     except Exception as e:
         logger.warning(f"   Reddit embed fetch failed: {e}")
-        return None, None
+        return None, None, None, None
 
 
 def download_reddit(url, quality='best'):
@@ -4514,9 +4524,10 @@ def download_reddit(url, quality='best'):
 
     # Fallback: try to extract direct media URL from embed.reddit.com
     post_id = _extract_reddit_post_id(url)
+    subreddit = _extract_reddit_subreddit(url)
     if post_id:
         logger.info(f"   Trying Reddit embed fallback for post ID: {post_id}")
-        media_url, ext = _fetch_reddit_embed_media(post_id)
+        media_url, ext, _, _ = _fetch_reddit_embed_media(post_id, subreddit)
         if media_url:
             logger.info(f"   Embed found media: {media_url[:80]}...")
             result = _download_raw_url(media_url, ext or 'jpg')

@@ -513,6 +513,12 @@ def detect_url_type(url):
             return 'quora_post'   # shortened link — always a post
         return 'quora_profile'
 
+    # ── Rumble ───────────────────────────────────────────────────────────
+    if 'rumble.com' in url:
+        if '/shorts/' in url or '/v' in url:
+            return 'rumble_video'
+        return 'rumble_video'
+
     # ── Generic/Unknown website (try with yt-dlp) ────────────────────────
     # If it's a valid URL from an unknown domain, mark it as 'generic'
     # so the frontend knows it's an experimental download
@@ -1026,6 +1032,64 @@ def quora_downloader_page():
     )
 
 
+@app.route('/rumble-video-downloader')
+@app.route('/rumble-downloader')
+def rumble_downloader_page():
+    rumble_jsonld = json.dumps({
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Rumble Video Downloader",
+        "url": "https://quicksavevideos.com/rumble-video-downloader",
+        "applicationCategory": "Multimedia",
+        "operatingSystem": "All",
+        "description": "Download Rumble videos and shorts for free online. Paste any Rumble video or short URL and save in HD quality up to 1080p.",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "browserRequirements": "Requires JavaScript"
+    })
+    seo_content = """
+    <div style="max-width:900px;margin:60px auto 40px;padding:0 20px;font-family:inherit;color:var(--text-primary,#0f172a)">
+      <h2 style="font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:16px">Rumble Video Downloader — Free Online Tool</h2>
+      <p style="font-size:15px;line-height:1.8;color:#475569;margin-bottom:24px">
+        QuickSaveVideos lets you <strong>download Rumble videos and shorts</strong> easily. 
+        Paste any Rumble video URL and save the video directly to your device in up to 1080p HD.
+        Works with standard videos and Rumble Shorts.
+      </p>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">How to Download Rumble Videos</h3>
+      <ol style="font-size:15px;line-height:2;padding-left:20px;color:#475569;margin-bottom:24px">
+        <li>Find a Rumble video or short you want to save.</li>
+        <li>Copy the URL from your browser's address bar.</li>
+        <li>Paste the link above, click <strong>Search</strong>, then <strong>Download</strong>.</li>
+      </ol>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:16px">Frequently Asked Questions</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;margin-bottom:40px">
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Can I download Rumble Shorts?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes. Rumble Shorts (rumble.com/shorts/...) are fully supported.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">What quality options are available for Rumble?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">You can download in up to 1080p HD. Available qualities: Best, 720p, 480p, 360p, and Audio.</p>
+        </details>
+        <details style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px">
+          <summary style="font-weight:600;cursor:pointer;font-size:15px">Is this Rumble downloader free?</summary>
+          <p style="margin-top:10px;color:#475569;font-size:14px;line-height:1.7">Yes — completely free. No sign-up, no limits, no hidden charges.</p>
+        </details>
+      </div>
+    </div>
+    """
+    return render_template(
+        'index.html',
+        page_title='Free Rumble Video Downloader Online — Save Videos & Shorts | QuickSaveVideos',
+        page_description='Download Rumble videos and shorts for free online. Paste any Rumble video or short URL and save MP4 videos in HD quality up to 1080p. Works on mobile, no login required.',
+        page_keywords='rumble video downloader, rumble shorts downloader, download rumble videos, rumble mp4 download, rumble video saver, save rumble video',
+        page_canonical='https://quicksavevideos.com/rumble-video-downloader',
+        page_h1='🎮 Free Rumble Video Downloader — Save Videos & Shorts',
+        page_subtitle='Paste any Rumble video or short URL to download in HD for free. No login, no watermark, no app required.',
+        page_seo_content=seo_content,
+        page_jsonld=rumble_jsonld,
+    )
+
+
 # ── SEO Guide Pages ──
 
 @app.route('/how-to-download-instagram-videos')
@@ -1065,6 +1129,11 @@ def guide_reddit():
 @app.route('/how-to-download-quora-videos')
 def guide_quora():
     return render_template('guide-quora.html')
+
+
+@app.route('/how-to-download-rumble-videos')
+def guide_rumble():
+    return render_template('guide-rumble.html')
 
 
 @app.route('/robots.txt')
@@ -1179,6 +1248,16 @@ def sitemap():
   </url>
   <url>
     <loc>https://quicksavevideos.com/how-to-download-quora-videos</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/rumble-video-downloader</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://quicksavevideos.com/how-to-download-rumble-videos</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -2074,6 +2153,23 @@ def extract_preview_info(url):
                 preview_data['description'] = author
         except Exception as e:
             logger.warning(f"⚠️ Quora curl_cffi preview failed: {e}")
+
+    # ── Method 9: Rumble page fetch (curl_cffi) ──
+    if not preview_data and 'rumble.com' in url:
+        try:
+            logger.info("🔍 Trying Rumble page fetch for preview...")
+            video_urls, title, thumbnail, duration = _fetch_rumble_media(url)
+            if thumbnail:
+                preview_data['thumbnail'] = thumbnail
+                preview_data['is_video'] = bool(video_urls)
+                preview_data['type'] = 'video' if video_urls else 'photo'
+                logger.info(f"✅ Rumble preview: thumbnail={thumbnail[:80]}")
+            if title:
+                preview_data['title'] = title
+            if duration:
+                preview_data['duration'] = duration
+        except Exception as e:
+            logger.warning(f"⚠️ Rumble preview failed: {e}")
 
     if preview_data:
         return preview_data
@@ -3331,6 +3427,15 @@ def download():
                 return result
             return jsonify({'error': 'Quora download failed. The post may be private or contain no media.'}), 400
 
+        # ── Rumble ──
+        if 'rumble.com' in url:
+            if not YTDLP_AVAILABLE:
+                return jsonify({'error': 'yt-dlp not installed'}), 500
+            result = download_rumble(url, quality)
+            if result:
+                return result
+            return jsonify({'error': 'Rumble download failed.'}), 400
+
         # ── Generic fallback — try yt-dlp for any other site ──
         if not YTDLP_AVAILABLE:
             return jsonify({'error': 'yt-dlp not available on this server'}), 500
@@ -3391,6 +3496,14 @@ REDDIT_FORMATS = {
 }
 
 QUORA_FORMATS = {
+    'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
+    '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
+    '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
+    '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio/best[height<=360]',
+    'audio': 'bestaudio',
+}
+
+RUMBLE_FORMATS = {
     'best':  'bestvideo[ext=mp4]+bestaudio/best[ext=mp4]/best',
     '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio/best[height<=720]',
     '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio/best[height<=480]',
@@ -4538,7 +4651,176 @@ def _fetch_quora_media(url):
         return None, None, None, None, None
 
 
-def download_quora(url, quality='best'):
+def _fetch_rumble_media(url):
+    """Fetch Rumble video page via curl_cffi and extract video URLs.
+
+    Returns (video_urls, title, thumbnail, duration)
+    where video_urls is a dict like {'360': 'url', '480': 'url', ...}
+    or (None, None, None, None) on failure.
+    """
+    logger.info(f"📡 Fetching Rumble page: {url}")
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+                       'AppleWebKit/537.36 (KHTML, like Gecko) '
+                       'Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+    }
+    try:
+        if CURL_CFFI_AVAILABLE:
+            resp = _cffi_req.get(url, headers=headers, impersonate='chrome', timeout=30)
+        else:
+            resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to fetch Rumble page: {e}")
+        return None, None, None, None
+
+    video_urls = {}
+    title = None
+    thumbnail = None
+    duration = None
+
+    # Method 1: Look for script#video-object-json or similar JSON config
+    # Rumble embeds video data in <script> with JSON containing mp4 URLs
+    patterns = [
+        r'<script[^>]*id="video-object"[^>]*>(.*?)</script>',
+        r'<script[^>]*id="videoPlayerPlaceholder"[^>]*>(.*?)</script>',
+        r'window\.videoData\s*=\s*({.*?});',
+        r'window\.__INITIAL_STATE__\s*=\s*({.*?});',
+        r'<script[^>]*>(.*?"mp4"\s*:.*?)</script>',
+    ]
+    config = None
+    for pat in patterns:
+        m = re.search(pat, html, re.DOTALL)
+        if m:
+            try:
+                config = json.loads(m.group(1))
+                break
+            except json.JSONDecodeError:
+                continue
+
+    if config:
+        mp4 = config.get('mp4') or config.get('video', {}).get('mp4') or {}
+        if isinstance(mp4, dict):
+            for qual, info in mp4.items():
+                if isinstance(info, dict):
+                    url_val = info.get('url')
+                elif isinstance(info, str):
+                    url_val = info
+                else:
+                    continue
+                if url_val and url_val.startswith('http'):
+                    video_urls[str(qual)] = url_val
+        title = (config.get('title')
+                 or config.get('video', {}).get('title')
+                 or config.get('headline'))
+        thumbnail = (config.get('thumbnail')
+                     or config.get('video', {}).get('thumbnail')
+                     or config.get('image'))
+        duration = (config.get('duration')
+                    or config.get('video', {}).get('duration'))
+
+    # Method 2: Fallback — scrape og:meta tags for thumbnail/title
+    if not title:
+        m = re.search(r'<meta\s+property="og:title"\s+content="([^"]*)"', html)
+        if m:
+            title = m.group(1)
+    if not thumbnail:
+        m = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', html)
+        if m:
+            thumbnail = m.group(1)
+
+    # Method 3: Try to find video URLs from <video> tag or direct mp4 links
+    if not video_urls:
+        # Look for <source> tags or data-mp4 attributes
+        for m in re.finditer(r'(?:data-mp4|data-url|src)\s*=\s*"([^"]*\.mp4[^"]*)"', html):
+            url_val = m.group(1)
+            if url_val.startswith('http'):
+                video_urls['source'] = url_val
+
+    logger.info(f"📡 Rumble page parsed: {len(video_urls)} qualities, title={title[:50] if title else None}")
+    return video_urls, title, thumbnail, duration
+
+
+def download_rumble(url, quality='best'):
+    """Download a Rumble video.
+
+    Strategy:
+      1. Try yt-dlp (works for standard /v{id} videos).
+      2. Fallback: curl_cffi page scrape + direct download.
+    """
+    is_audio = (quality == 'audio')
+    logger.info(f"📋 Rumble download: {url} | quality={quality}")
+
+    # ── Method 1: yt-dlp ──
+    if YTDLP_AVAILABLE:
+        try:
+            fmt = RUMBLE_FORMATS.get(quality, RUMBLE_FORMATS['best'])
+            if is_audio:
+                candidates = [fmt, 'bestaudio/best', 'best']
+            elif FFMPEG_AVAILABLE:
+                candidates = [fmt, 'bestvideo+bestaudio/best', 'best']
+            else:
+                candidates = [fmt, 'best[ext=mp4]/best', 'best']
+
+            filename, file_size = _download_with_format_fallback(
+                url,
+                os.path.join(DOWNLOAD_FOLDER, '%(id)s.%(ext)s'),
+                candidates,
+                timeout=60,
+                merge=(not is_audio),
+                scan_exts=('mp4', 'mkv', 'webm', 'mp3', 'm4a')
+            )
+            if filename:
+                logger.info(f"✅ Rumble yt-dlp: {os.path.basename(filename)} ({file_size/(1024*1024):.2f} MB)")
+                return jsonify({
+                    'success':   True,
+                    'filename':  os.path.basename(filename),
+                    'file_size': f"{file_size/(1024*1024):.2f} MB",
+                })
+        except Exception as e:
+            err_text = str(e).lower()
+            if 'unsupported url' in err_text or 'video unavailable' in err_text:
+                logger.info(f"⚠️ yt-dlp RumbleIE failed, trying generic/page scrape: {e}")
+            else:
+                logger.info(f"⚠️ yt-dlp failed for Rumble, trying page scrape: {e}")
+
+    # ── Method 2: curl_cffi page scrape + direct download ──
+    try:
+        video_urls, title, thumbnail, duration = _fetch_rumble_media(url)
+        if not video_urls:
+            return jsonify({'error': 'Could not extract video URLs from Rumble page.'}), 400
+
+        # Pick the best quality <= requested quality
+        quality_map = {'best': 99999, '1080p': 1080, '720p': 720, '480p': 480, '360p': 360}
+        target_height = quality_map.get(quality, 99999)
+        chosen_url = None
+        chosen_qual = 0
+        for qual_str, url_val in sorted(video_urls.items()):
+            try:
+                h = int(qual_str)
+            except ValueError:
+                h = 0
+            if h <= target_height and h >= chosen_qual:
+                chosen_url = url_val
+                chosen_qual = h
+        if not chosen_url:
+            chosen_url = list(video_urls.values())[0]
+
+        ext = 'mp4'
+        result = _download_raw_url(chosen_url, ext)
+        if result:
+            logger.info(f"✅ Rumble page scrape: quality={chosen_qual}p")
+            return result
+    except Exception as e:
+        logger.warning(f"⚠️ Rumble page scrape download failed: {e}")
+
+    return jsonify({'error': 'Could not download this Rumble video.'}), 400
+
+
+
     """Download a Quora post (video/image) using yt-dlp, with curl_cffi fallback."""
     is_audio = (quality == 'audio')
     logger.info(f"📋 Quora download: {url} | quality={quality}")
@@ -5429,6 +5711,8 @@ def _download_raw_url(media_url, ext):
             referer = 'https://twitter.com/'
         elif 'licdn.com' in media_url or 'linkedin.com' in media_url:
             referer = 'https://www.linkedin.com/'
+        elif 'rumble.com' in media_url:
+            referer = 'https://rumble.com/'
         else:
             referer = 'https://www.instagram.com/'
         headers = {
@@ -5483,9 +5767,10 @@ def proxy_thumbnail():
                'twimg.com', 'pbs.twimg.com',
                'pinimg.com', 'i.pinimg.com',
                'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktok.com',
-               'licdn.com', 'linkedin.com',
-               'reddit.com', 'redd.it', 'preview.redd.it', 'i.redd.it',
-               'quora.com', 'qph.cf2.quoracdn.net', 'quoracdn.net')
+                'licdn.com', 'linkedin.com',
+                'reddit.com', 'redd.it', 'preview.redd.it', 'i.redd.it',
+                'quora.com', 'qph.cf2.quoracdn.net', 'quoracdn.net',
+                'rumble.com')
     if not any(d in img_url for d in allowed):
         return jsonify({'error': 'Disallowed domain'}), 403
     try:
@@ -5495,6 +5780,7 @@ def proxy_thumbnail():
         is_linkedin   = 'licdn.com' in img_url or 'linkedin.com' in img_url
         is_reddit     = 'reddit.com' in img_url or 'redd.it' in img_url
         is_quora      = 'quoracdn.net' in img_url or 'quora.com' in img_url
+        is_rumble     = 'rumble.com' in img_url
         headers = {
             'User-Agent': get_random_user_agent(),
             'Referer':    ('https://www.tiktok.com/' if is_tiktok
@@ -5503,10 +5789,12 @@ def proxy_thumbnail():
             else 'https://www.linkedin.com/' if is_linkedin
             else 'https://www.reddit.com/' if is_reddit
             else 'https://www.quora.com/' if is_quora
+            else 'https://rumble.com/' if is_rumble
             else 'https://www.instagram.com/'),
             'Accept':     'image/webp,image/apng,image/*,*/*;q=0.8',
         }
-        if not is_twitter and not is_pinterest and not is_tiktok and not is_linkedin and not is_reddit and not is_quora:
+        skip_cookies = is_twitter or is_pinterest or is_tiktok or is_linkedin or is_reddit or is_quora or is_rumble
+        if not skip_cookies:
             cookies = load_cookies()
             if cookies:
                 headers['Cookie'] = '; '.join(f"{k}={v}" for k, v in cookies.items() if v)

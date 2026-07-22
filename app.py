@@ -2020,8 +2020,9 @@ def extract_preview_info(url):
     import re
 
     # Normalize Bilibili URLs: yt-dlp BiliBiliIE only matches www.bilibili.com, not m.bilibili.com
+    # Also strip trailing slash to prevent www→m redirect
     if 'bilibili.com' in url:
-        url = url.replace('m.bilibili.com', 'www.bilibili.com').split('?')[0].split('#')[0]
+        url = url.replace('m.bilibili.com', 'www.bilibili.com').rstrip('/')
 
     preview_data = {}
 
@@ -3726,7 +3727,8 @@ def download():
             if not YTDLP_AVAILABLE:
                 return jsonify({'error': 'yt-dlp not installed'}), 500
             # Normalize m.bilibili.com → www.bilibili.com (yt-dlp BiliBiliIE only matches www)
-            normalized = url.replace('m.bilibili.com', 'www.bilibili.com').split('?')[0].split('#')[0]
+            # Also strip trailing slash to prevent www→m redirect
+            normalized = url.replace('m.bilibili.com', 'www.bilibili.com').rstrip('/')
             result = download_generic(normalized, quality)
             if result:
                 return result

@@ -6,14 +6,14 @@ plugins {
 
 android {
     namespace = "com.quicksavevideos.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.quicksavevideos.app"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 7
-        versionName = "2.3"
+        targetSdk = 36
+        versionCode = 8
+        versionName = "2.4"
     }
 
     signingConfigs {

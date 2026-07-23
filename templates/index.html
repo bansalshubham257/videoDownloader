@@ -1256,6 +1256,11 @@
             background: linear-gradient(135deg, #00a1d6 0%, #0082b4 100%);
             color: #fff;
         }
+        .yt-q-btn.vk-active {
+            border-color: #0077ff;
+            background: linear-gradient(135deg, #0077ff 0%, #005bb5 100%);
+            color: #fff;
+        }
 
         /* Auto-download mode: hide manual quality/content selectors */
         body.auto-download-mode .options-row,
@@ -1436,6 +1441,9 @@
         }
         .dl-btn-wrap button.bl-btn {
             background: linear-gradient(135deg, #00a1d6 0%, #0082b4 100%);
+        }
+        .dl-btn-wrap button.vk-btn {
+            background: linear-gradient(135deg, #0077ff 0%, #005bb5 100%);
         }
 
         .dl-btn-wrap button.generic-btn {
@@ -2789,6 +2797,7 @@
                 <span class="brand-pill pill-dm">📺 Dailymotion</span>
                 <span class="brand-pill pill-od">📼 Odysee</span>
                 <span class="brand-pill pill-bl">🇨🇳 Bilibili</span>
+                <span class="brand-pill pill-vk">🎞️ VK</span>
             </div>
             <div class="search-row">
                 <div class="input-wrap">
@@ -2967,6 +2976,14 @@
                 <button class="yt-q-btn"           data-q="480p"  onclick="setBlQuality(this)">📺 480p</button>
                 <button class="yt-q-btn"           data-q="360p"  onclick="setBlQuality(this)">📱 360p</button>
                 <button class="yt-q-btn"           data-q="audio" onclick="setBlQuality(this)">🎵 Audio</button>
+            </div>
+
+            <div class="yt-quality-row" id="vk-quality-row">
+                <button class="yt-q-btn vk-active" data-q="best"  onclick="setVkQuality(this)">🏆 Best</button>
+                <button class="yt-q-btn"           data-q="720p"  onclick="setVkQuality(this)">📹 720p</button>
+                <button class="yt-q-btn"           data-q="480p"  onclick="setVkQuality(this)">📺 480p</button>
+                <button class="yt-q-btn"           data-q="360p"  onclick="setVkQuality(this)">📱 360p</button>
+                <button class="yt-q-btn"           data-q="audio" onclick="setVkQuality(this)">🎵 Audio</button>
             </div>
 
             <div class="media-card">
@@ -3280,11 +3297,22 @@
             </ol>
             <p>Download Bilibili videos and Bangumi episodes in HD quality. Supports both www and mobile URLs.</p>
         </article>
+
+        <article class="guide-card" id="guide-vk">
+            <h3>How to Download VK Videos</h3>
+            <ol>
+                <li><strong>Copy the VK video URL</strong> — Open VK or VK Video, find the video you want, and copy the URL from the address bar.</li>
+                <li><strong>Paste into QuickSaveVideos</strong> — Paste the VK URL into the search box and click Search.</li>
+                <li><strong>Preview the video</strong> — The tool shows a preview with the video thumbnail and title.</li>
+                <li><strong>Download</strong> — Choose your preferred quality and click Download.</li>
+            </ol>
+            <p>Download public VK videos and VK Video clips in HD quality. Supports vk.com and vkvideo.ru URLs.</p>
+        </article>
     </section>
 
     <!-- SEO Footer -->
     <footer class="site-footer">
-        <h2 class="footer-heading">Free Online Video Downloader — TikTok, Instagram, YouTube, Twitter/X, Facebook, Pinterest, LinkedIn, Reddit, Quora, Rumble, BitChute, Dailymotion, Odysee &amp; Bilibili</h2>
+        <h2 class="footer-heading">Free Online Video Downloader — TikTok, Instagram, YouTube, Twitter/X, Facebook, Pinterest, LinkedIn, Reddit, Quora, Rumble, BitChute, Dailymotion, Odysee, Bilibili &amp; VK</h2>
 
         <p class="footer-copy">
             <strong>QuickSaveVideos</strong> is a free, fast, and mobile-friendly video downloader that lets you save videos and photos
@@ -3308,6 +3336,7 @@
             <a href="/" aria-label="Dailymotion video downloader">Dailymotion downloader</a>
             <a href="/" aria-label="Odysee video downloader">Odysee downloader</a>
             <a href="/" aria-label="Bilibili video downloader">Bilibili downloader</a>
+            <a href="/" aria-label="VK video downloader">VK downloader</a>
             <a href="/" aria-label="Instagram Reels downloader">Reels downloader</a>
             <a href="/" aria-label="YouTube Shorts downloader">Shorts downloader</a>
             <a href="/" aria-label="YouTube to MP3 audio downloader">YouTube to MP3</a>
@@ -3362,6 +3391,10 @@
             <strong>Bilibili Downloader:</strong> Download Bilibili videos and Bangumi episodes in HD quality.
             Supports both www and mobile Bilibili URLs.
         </p>
+        <p class="footer-copy">
+            <strong>VK Downloader:</strong> Download public VK and VK Video clips in HD quality.
+            Supports vk.com/video and vkvideo.ru URLs.
+        </p>
 
         <p class="footer-copy">
             This online downloader works on all devices — desktop, Android, and iPhone — and requires no app install.
@@ -3389,6 +3422,7 @@
             <a href="{{ url_for('guide_dailymotion') }}">Dailymotion Download Guide</a>
             <a href="{{ url_for('guide_odysee') }}">Odysee Download Guide</a>
             <a href="{{ url_for('guide_bilibili') }}">Bilibili Download Guide</a>
+            <a href="{{ url_for('guide_vk') }}">VK Download Guide</a>
         </nav>
         <nav class="footer-links" aria-label="Company pages" style="margin-top:8px">
             <a href="{{ url_for('about') }}">About</a>
@@ -3413,6 +3447,7 @@
     let dmQuality = 'best';
     let odQuality = 'best';
     let blQuality = 'best';
+    let vkQuality = 'best';
     let previewData     = null;
     let dlHistory = JSON.parse(localStorage.getItem('igDlHistory') || '[]').slice(0, 5);
     renderHistory();
@@ -3433,6 +3468,7 @@
         'dailymotion': '/how-to-download-dailymotion-videos',
         'odysee': '/how-to-download-odysee-videos',
         'bilibili': '/how-to-download-bilibili-videos',
+        'vk': '/how-to-download-vk-videos',
     };
     function updateGuideLink(platform) {
         const el = document.getElementById('guide-link');
@@ -3545,6 +3581,11 @@
         btn.classList.add('bl-active');
         blQuality = btn.dataset.q;
     }
+    function setVkQuality(btn) {
+        document.querySelectorAll('#vk-quality-row .yt-q-btn').forEach(b => b.classList.remove('active','vk-active'));
+        btn.classList.add('vk-active');
+        vkQuality = btn.dataset.q;
+    }
 
     /* ─── SEARCH ─────────────────────────────────────────────────────────── */
     async function handleSearch() {
@@ -3633,6 +3674,9 @@
             } else if (type === 'bilibili_video') {
                 currentPlatform = 'bilibili';
                 await loadSinglePost(url, 'bilibili');
+            } else if (type === 'vk_video') {
+                currentPlatform = 'vk';
+                await loadSinglePost(url, 'vk');
             } else if (type === 'generic') {
                 // generic_video — any URL yt-dlp might support (Vimeo, Twitch, etc.)
                 currentPlatform = 'generic';
@@ -3892,6 +3936,7 @@
         const dmOpts = document.getElementById('dm-quality-row');
         const odOpts = document.getElementById('od-quality-row');
         const blOpts = document.getElementById('bl-quality-row');
+        const vkOpts = document.getElementById('vk-quality-row');
         const dlBtn  = document.getElementById('s-dl-btn');
 
         // Reset all
@@ -3906,7 +3951,8 @@
         dmOpts.classList.remove('show');
         odOpts.classList.remove('show');
         blOpts.classList.remove('show');
-        dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn', 'li-btn', 'generic-btn', 'story-btn', 'ru-btn', 'bc-btn', 'dm-btn', 'od-btn', 'bl-btn');
+        vkOpts.classList.remove('show');
+        dlBtn.classList.remove('yt-btn', 'tw-btn', 'pi-btn', 'fb-btn', 'tk-btn', 'li-btn', 'generic-btn', 'story-btn', 'ru-btn', 'bc-btn', 'dm-btn', 'od-btn', 'bl-btn', 'vk-btn');
 
         if      (platform === 'youtube')        { ytOpts.classList.add('show'); dlBtn.classList.add('yt-btn'); }
         else if (platform === 'twitter')        { twOpts.classList.add('show'); dlBtn.classList.add('tw-btn'); }
@@ -3921,6 +3967,7 @@
         else if (platform === 'dailymotion') { dmOpts.classList.add('show'); dlBtn.classList.add('dm-btn'); }
         else if (platform === 'odysee')      { odOpts.classList.add('show'); dlBtn.classList.add('od-btn'); }
         else if (platform === 'bilibili')    { blOpts.classList.add('show'); dlBtn.classList.add('bl-btn'); }
+        else if (platform === 'vk')          { vkOpts.classList.add('show'); dlBtn.classList.add('vk-btn'); }
         else if (platform === 'generic')        { dlBtn.classList.add('generic-btn'); }
         else if (platform === 'instagram_story'){ dlBtn.classList.add('story-btn'); }   // stories & highlights
         else                                    { igOpts.style.display = 'flex'; }
@@ -3959,7 +4006,7 @@
         if (thumbWrap) {
             thumbWrap.classList.remove('ratio-16-9', 'ratio-1-1');
             thumbWrap.classList.add(
-                (currentPlatform === 'youtube' || currentPlatform === 'twitter' || currentPlatform === 'facebook' || currentPlatform === 'linkedin' || currentPlatform === 'rumble' || currentPlatform === 'bitchute' || currentPlatform === 'dailymotion' || currentPlatform === 'odysee' || currentPlatform === 'bilibili' || currentPlatform === 'generic')
+                (currentPlatform === 'youtube' || currentPlatform === 'twitter' || currentPlatform === 'facebook' || currentPlatform === 'linkedin' || currentPlatform === 'rumble' || currentPlatform === 'bitchute' || currentPlatform === 'dailymotion' || currentPlatform === 'odysee' || currentPlatform === 'bilibili' || currentPlatform === 'vk' || currentPlatform === 'generic')
                 ? 'ratio-16-9'
                 : (currentPlatform === 'tiktok' || currentPlatform === 'instagram_story')
                 ? 'ratio-9-16'
@@ -4023,6 +4070,7 @@
                    : currentPlatform === 'dailymotion' ? { url: currentUrl, quality: dmQuality }
                    : currentPlatform === 'odysee'      ? { url: currentUrl, quality: odQuality }
                    : currentPlatform === 'bilibili'    ? { url: currentUrl, quality: blQuality }
+                   : currentPlatform === 'vk'          ? { url: currentUrl, quality: vkQuality }
                    : currentPlatform === 'pinterest'      ? { url: currentUrl }
                    : currentPlatform === 'reddit'         ? { url: currentUrl }
                    : currentPlatform === 'quora'          ? { url: currentUrl }

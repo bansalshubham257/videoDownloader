@@ -2690,44 +2690,48 @@
 
         /* ── Platform guides section ── */
         .site-guides {
-            max-width: 900px;
+            max-width: 1100px;
             margin: 48px auto;
             padding: 0 20px;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
         }
         .site-guides h2 {
             font-size: 24px;
+            grid-column: 1 / -1;
             margin: 0 0 8px;
             color: var(--text-primary);
             text-align: center;
-            grid-column: 1 / -1;
         }
         .guide-card {
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 20px 24px;
+            border-radius: 8px;
+            padding: 14px 16px;
             background: var(--bg-primary);
         }
         .guide-card h3 {
-            font-size: 17px;
-            margin: 0 0 10px;
+            font-size: 15px;
+            margin: 0 0 8px;
             color: var(--primary);
         }
         .guide-card ol {
-            margin: 0 0 8px;
-            padding-left: 20px;
+            margin: 0 0 6px;
+            padding-left: 18px;
         }
         .guide-card li {
-            margin-bottom: 4px;
-            line-height: 1.6;
+            margin-bottom: 3px;
+            line-height: 1.5;
             color: var(--text-secondary);
+            font-size: 13px;
         }
         .guide-card p {
             margin: 0;
             color: var(--text-tertiary);
-            font-size: 14px;
+            font-size: 12.5px;
+        }
+        @media (max-width: 900px) {
+            .site-guides { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 640px) {
             .site-guides { grid-template-columns: 1fr; }

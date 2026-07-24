@@ -17,6 +17,9 @@ downloads/
 *.jpg
 *.jpeg
 *.png
+!static/favicon.ico
+!static/apple-touch-icon.png
+!static/og-image.png
 *.gif
 *.webm
 *.m4a

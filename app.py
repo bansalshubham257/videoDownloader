@@ -1484,6 +1484,12 @@ Sitemap: https://quicksavevideos.com/sitemap.xml
     return Response(txt, mimetype='text/plain')
 
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_file(os.path.join(app.static_folder, 'favicon.ico'),
+                     mimetype='image/x-icon')
+
+
 @app.route('/sitemap.xml')
 def sitemap():
     xml = """<?xml version="1.0" encoding="UTF-8"?>
